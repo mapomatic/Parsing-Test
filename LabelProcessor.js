@@ -4,10 +4,11 @@
 /* global esprima */
 
 // TODO: Missing syntax:
-//  Unexpected member expression object type: CallExpression, ArrowFunctionExpression, ||, ===, ==, >
+//  ArrowFunctionExpression
 
-// TODO: Fix these in labels:
-// formatLabel(*label*), createLabel(*fieldValues*), test 78 fails, ?? doesn't work with esprima
+// TODO: Not working:
+// - Variable scope
+// - Predicate functions don't work correctly e.g. myArray.some(predicateFunction)
 
 // eslint-disable-next-line no-unused-vars
 class LabelProcessor {
@@ -195,15 +196,8 @@ class LabelProcessor {
         return returnValue;
     }
 
-    static processArrowFunctionExpression(node) {
-        let returnValue;
-        let arguemts = node.arguemts.map(arg => this.processNode(arg));
-        returnValue = () => 1;
-        console.log(node);
-        // if (node.id != null) {
-
-        // }
-        return returnValue;
+    static processArrowFunctionExpression() {
+        throw new SyntaxError('Arrow functions are not supported yet.');
     }
 
     static processFunctionDeclaration(node) {
@@ -290,7 +284,6 @@ class LabelProcessor {
     static processIdentifier(node, context) {
         switch (context?.type) {
             case esprima.Syntax.BinaryExpression:
-                return this.getTopLevelVariable(node.name);
             case esprima.Syntax.LogicalExpression:
                 return this.getTopLevelVariable(node.name);
             default:
@@ -330,15 +323,6 @@ class LabelProcessor {
     static notEqualEqual(left, right, context) {
         return this.processNode(left, context) !== this.processNode(right, context);
     }
-    // processExpressionStatement(expression) {
-    //     switch (expression.type) {
-    //         case esprima.Syntax.BinaryExpression:
-    //             processBinaryExpression(expression);
-    //             break;
-    //         default:
-    //             throw new Error(`Unexpected expression statement type: ${expression.type}`);
-    //     }
-    // }
 
     static getTopLevelVariable(variableName) {
         let returnValue;

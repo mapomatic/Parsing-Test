@@ -405,8 +405,8 @@
     const tests = [
         new Test({
             id: 1,
-            code: 'const numberAtEndPattern = /\\s+(\\d+)$/; const match = fieldValues.Location.match(numberAtEndPattern); if (match) return match; return "";',
-            variables: { fieldValues: { Location: 'test' } },
+            code: "return 'MM ' + Math.round(label).toString()",
+            variables: { label: '32', fieldValues: { v: '5' } },
             expectedOutput: 'DLT_LABEL'
         }),
         new Test({
@@ -425,18 +425,18 @@
         })
     ];
 
-    // moreTests.forEach((code, index) => {
-    //     const test = new Test({
-    //         id: 9 + index,
-    //         code,
-    //         variables: { fieldValues: {} },
-    //         expectedOutput: ''
-    //     });
-    //     code.matchAll(/fieldValues\.([a-z0-9_]+)/ig).forEach(match => ([, test.variables.fieldValues[match[1]]] = match));
-    //     tests.push(test);
-    // });
+    moreTests.forEach((code, index) => {
+        const test = new Test({
+            id: 3 + index,
+            code,
+            variables: { fieldValues: {} },
+            expectedOutput: ''
+        });
+        code.matchAll(/fieldValues\.([a-z0-9_]+)/ig).forEach(match => ([, test.variables.fieldValues[match[1]]] = match));
+        tests.push(test);
+    });
 
-    const ONLY_RUN_TEST_ID = -1;
+    const ONLY_RUN_TEST_ID = 1;
     let errorCount = 0;
 
     tests.forEach(test => {
@@ -447,14 +447,14 @@
             tree = LabelProcessor.parseLabelScript(test.code);
 
             const result = LabelProcessor.process(tree, test.variables);
-            // const validated = test.validate(result.output);
-            // console.log(`Test ${test.id} validated = ${validated}`);
-            // if (!validated) {
-            //     console.log(test);
-            //     console.log(tree);
-            //     console.log(`output = ${result.output}`);
-            //     console.log('variables:', result.variables);
-            // }
+            const validated = test.validate(result.output);
+            console.log(`Test ${test.id} validated = ${validated}`);
+            if (!validated) {
+                console.log(test);
+                console.log(tree);
+                console.log(`output = ${result.output}`);
+                console.log('variables:', result.variables);
+            }
         } catch (ex) {
             errorCount++;
             console.error(`Error in test "${test.id}"`, ex);
