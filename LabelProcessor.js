@@ -1,14 +1,26 @@
-/* eslint-disable max-classes-per-file */
-/* eslint-disable no-multi-assign */
+// name         LabelProcessor
+// namespace    https://greasyfork.org/users/45389
+// version      1.0.0
+// description  Converts simple text scripts into executable JS
+// author       MapOMatic
+// license      GNU GPLv3
+// ==/UserScript==
 
-/* global esprima */
+// NOTE: The esprima library must be included to use this, e.g.:
+// @require  https://cdn.jsdelivr.net/npm/esprima@4/dist/esprima.min.js
 
 // TODO: Missing syntax:
 //  ArrowFunctionExpression
 
 // TODO: Not working:
 // - Variable scope
-// - Predicate functions don't work correctly e.g. myArray.some(predicateFunction)
+// - Array predicate functions don't work correctly e.g. myArray.some(predicateFunction)
+// - A lot of other stuff that I may never get around to...
+
+/* eslint-disable max-classes-per-file */
+/* eslint-disable no-multi-assign */
+
+/* global esprima */
 
 // eslint-disable-next-line no-unused-vars
 class LabelProcessor {
@@ -293,6 +305,7 @@ class LabelProcessor {
             case esprima.Syntax.LogicalExpression:
             case esprima.Syntax.VariableDeclarator:
             case esprima.Syntax.ObjectExpression:
+            case esprima.Syntax.CallExpression:
                 return this.getTopLevelVariable(node.name);
             default:
                 return node.name;
@@ -460,7 +473,7 @@ class LabelProcessor {
             default:
                 throw new SyntaxError(`Unexpected callee type in call expression: ${callee.type}`);
         }
-        const args = expression.arguments.map(arg => this.processNode(arg));
+        const args = expression.arguments.map(arg => this.processNode(arg, expression));
         const returnValue = methodToCall.call(calleeObject, ...args);
         return returnValue;
     }

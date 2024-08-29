@@ -3,7 +3,7 @@ class Test {
     variables;
     static DEFAULT_VARIABLES = {
         label: 'DEFAULT_LABEL',
-        W: { map: { getZoom: () => 34 } }
+        W: { map: { getZoom: () => 34, zoom: 34 } }
     };
 
     constructor(args) {

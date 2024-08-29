@@ -88,14 +88,14 @@
         "return label.replace(/^0+/,'');",
         `function formatLabel(label1) {  if(label1 && label1 !== 'null' && label1 !== 'null null') {  return label1.replace(/\\(/g, "").replace(/\\)/g, "").trim();  }  return ''; } label = formatLabel(fieldValues.CompleteAddressNumber + ' ' + fieldValues.CompleteStreetName); if (!label) {  let formattedAddress = formatLabel(  (fieldValues.AddressNumber +   fieldValues.AddressNumberSuffix + ' ' +   fieldValues.StreetNamePreModifier +   fieldValues.StreetNamePreDirectional +   fieldValues.StreetNamePreType + ' ' +  fieldValues.StreetName + ' ' +   fieldValues.StreetNamePostType +   fieldValues.StreetNamePostDirectional +   fieldValues.StreetNamePostModifier).replace(/null/g, "")  );  if (formattedAddress.startsWith('0 '))  {  formattedAddress = '';  }  let formattedLocation = formatLabel(fieldValues.LocationDescription);  let formattedComments = formatLabel(fieldValues.Comments);  label = formattedAddress + '\\n';  if (formattedLocation !== formattedComments) {  label += formattedLocation + '\\n' + formattedComments;  } else {  label += formattedLocation;  } } return label;`,
         `label = ""; if (fieldValues.addr_housenumber) { label += fieldValues.addr_housenumber;} if (fieldValues.addr_street) { label += ' '+fieldValues.addr_street;} if (fieldValues.addr_unit) { label += ' ' + fieldValues.addr_unit;} if (fieldValues.addr_city) { label += '\\n' + fieldValues.addr_city;} return label;`,
-        `label = ""; if (fieldValues.AddNo_Full) { label += fieldValues.AddNo_Full;} if (fieldValues. StNam_Full) { label += ' '+fieldValues. StNam_Full;} if (fieldValues.Inc_Muni) { label += '\\n' + fieldValues.Inc_Muni;} return label;`,
+        `label = ""; if (fieldValues.AddNo_Full) { label += fieldValues.AddNo_Full;} if (fieldValues.StNam_Full) { label += ' '+fieldValues.StNam_Full;} if (fieldValues.Inc_Muni) { label += '\\n' + fieldValues.Inc_Muni;} return label;`,
         "label = '#' + fieldValues.structure_number_008 + '\\n' + fieldValues.facility_carried_007 + '\\n' + ' over ' + fieldValues.features_desc_006a;  return label;",
         "label = '#' + fieldValues.BridgeStructureNumber + '\\n' + fieldValues.FacilityCarried_NBI7 + '\\n' + ' over ' + fieldValues.FeatureCrossed_NBI6A;  if (fieldValues.BridgeName) { label += ' ( ' + fieldValues.BridgeName +' )';} return label;",
         "label = fieldValues.ROUTE_ID + '\\n' + 'EXIT: '; let exits = [fieldValues.EXIT_EXIT_NUM1, fieldValues.EXIT_EXIT_NUM2, fieldValues.EXIT_EXIT_NUM3].filter(Boolean).join(' & '); label += exits + '\\n' + (fieldValues.EXIT_EXIT_DESC ? fieldValues.EXIT_EXIT_DESC.replace(/\\(.*?\\)/g, '').trim() : '');  if (fieldValues.EXIT_EXIT_HISTORICAL) {   label += '\\n' + 'OLD EXIT: ' + fieldValues.EXIT_EXIT_HISTORICAL;  }  return label;",
         "label = 'SL: ' + fieldValues.SpeedLimit; if (fieldValues.SectionFromLocation) {   label += ' | FROM: ' + fieldValues.SectionFromLocation;  } if (fieldValues.SectionToLocation) {   label += ' | TO: ' + fieldValues.SectionToLocation;  } return label;",
         `label = ""; if (fieldValues.Location) {  const numberAtEndPattern = /\\s+(\\d+)$/;  const match = fieldValues.Location.match(numberAtEndPattern);  if (match) {  const houseNumber = match[1].replace(/^0+/, '');  label = houseNumber + ' ' + fieldValues.Location.replace(numberAtEndPattern, '').trim();  } else {  label = fieldValues.Location.replace(/^0+/, '').trim();  } } if (fieldValues.Town_Name) {  const townNameTrimmed = fieldValues.Town_Name.trim();  label += (label ? '\\n' : '') + townNameTrimmed; } if (!/^\\d+\\s/.test(label.trim()) && fieldValues.Mailing_Address) {  const mailingAddressTrimmed = fieldValues.Mailing_Address.trim();  label += (label ? '\\nMail Add: ' : 'Mail Add: ') + mailingAddressTrimmed; } return label`,
         "label = fieldValues.OFFIC_NAME + '\\n' + fieldValues.OS_TYPE; return label;",
-        "label = fieldValues.AV_LEGEND + '\\n' + fieldValues. IMS_LEGEND + '\\n' + fieldValues. PROPERTY; return label;",
+        "label = fieldValues.AV_LEGEND + '\\n' + fieldValues.IMS_LEGEND + '\\n' + fieldValues.PROPERTY; return label;",
         "return label.replace(/#\\d+$/, '');",
         "return label.replace(/LOT\\s[A-Za-z0-9-]+\\s/gi, '');",
         "return label.replace(/^0\\s+/, '');",
@@ -131,11 +131,11 @@
         "label = 'UGA Parking Lot'; if (fieldValues.PKLOT_CODE !== '<Null>' && fieldValues.PKLOT_CODE !== null && fieldValues.PKLOT_CODE !== '')  label += '\\n' + fieldValues.PKLOT_CODE; return label;",
         "return fieldValues.NAME + '\\n' + '(' + fieldValues.SPEED_LIMI + 'MPH' + ')'",
         "return 'MM ' + label.replace(/;.*/g,'');",
-        `label = fieldValues.REV_LongLabel; const pattern = /, ID.*/; label = label.replace(pattern, ''); Removes ", ID" and following characters const pattern2 = /^[^\\d]*\\b(?=\\d)/; label = label.replace(pattern2, ''); Removes beginning non-digits until the first number label = label.replace(/,/g, '\\n'); return label.trim();`,
+        `label = fieldValues.REV_LongLabel; const pattern = /, ID.*/; label = label.replace(pattern, ''); const pattern2 = /^[^\\d]*\\b(?=\\d)/; label = label.replace(pattern2, ''); label = label.replace(/,/g, '\\n'); return label.trim();`,
         "label = 'BRKEY#' + fieldValues.BRKEY + '\\n' + fieldValues.ROUTE + '\\n' + ' over ' + fieldValues.FEATURES;  return label;",
         "var options = {day:'2-digit',year:'numeric',month:'2-digit',hour:'2-digit',minute:'2-digit'}; return `${fieldValues.ROADWAY} closed\\nfrom ${fieldValues.LOCATION}\\n${new Date(fieldValues.START).toLocaleString('en-US', options)}\\n${new Date(fieldValues.FINISH).toLocaleString('en-US', options)}`;",
         "return label === 'not available' ? '' : label;",
-        'return `${fieldValues.PRMTLOCATN}\\nclosed from\\n${fieldValues.TEXTSTART} to ${fieldValues.TEXTEND}\\nfor ${fieldValues.TEXTDESCR ?? "Unknown"}`;',
+        'return `${fieldValues.PRMTLOCATN}\\nclosed from\\n${fieldValues.TEXTSTART} to ${fieldValues.TEXTEND}\\nfor ${fieldValues.TEXTDESCR || "Unknown"}`;',
         "label = ''; label += fieldValues.fullname; if(fieldValues.stroute) {label += ' / Rte ' + fieldValues.stroute;} if(fieldValues.astrte) {label += ' / Rte ' + fieldValues.astrte;} return label;",
         "label = ''; return label;",
         "label = ''; sd = new Date(Number(fieldValues.StartDate)); ed = new Date(Number(fieldValues.EndDate)); label += fieldValues.Route1 + ' - ' + fieldValues.ConstructionType; label += '\\nStart: ' + sd.toLocaleDateString() + ' ' + sd.toLocaleTimeString(); label += '\\nEnd: ' + ed.toLocaleDateString() + ' ' + ed.toLocaleTimeString(); label += '\\n' + fieldValues.SuggestionToMotorist;  return label;",
@@ -252,7 +252,7 @@
         "label = ''; var cd = new Date(Number(fieldValues.CREATE_DATE)); label += fieldValues.CARTONAME + ' - ' + cd.toLocaleDateString(); return label;",
         "label = ''; var cd = new Date(Number(fieldValues.CREATEDATE)); label += fieldValues.STREET+ ' - ' + cd.toLocaleDateString(); return label;",
         "return '';",
-        "label =`${fieldValues.STREET_PREFIX_DIR_CD??''} ${fieldValues.STREET_NAME??''} ${fieldValues.STREET_SUFFIX_CD??''} ${fieldValues.STREET_DIR_SUFFIX_CD??''}`; if (!['IR','RA','MR','TR'].includes(fieldValues.ROUTE_TYPE)) label += ` / ${fieldValues.ROUTE_TYPE??''}-${Number(fieldValues.ROUTE_NBR??'')} ${fieldValues.ROUTE_SUFFIX != '*' ? fieldValues.ROUTE_SUFFIX : ''}`; if (fieldValues.SPEED_LIMIT_NBR) label += `(${fieldValues.SPEED_LIMIT_NBR} MPH)`; return label;",
+        "label =`${fieldValues.STREET_PREFIX_DIR_CD||''} ${fieldValues.STREET_NAME||''} ${fieldValues.STREET_SUFFIX_CD||''} ${fieldValues.STREET_DIR_SUFFIX_CD||''}`; if (!['IR','RA','MR','TR'].includes(fieldValues.ROUTE_TYPE)) label += ` / ${fieldValues.ROUTE_TYPE||''}-${Number(fieldValues.ROUTE_NBR||'')} ${fieldValues.ROUTE_SUFFIX != '*' ? fieldValues.ROUTE_SUFFIX : ''}`; if (fieldValues.SPEED_LIMIT_NBR) label += `(${fieldValues.SPEED_LIMIT_NBR} MPH)`; return label;",
         "let zoom = W.map.getZoom(); if (zoom >= 14) {  label = fieldValues.org_name; } if (zoom >= 17) {  label += '\\n' + fieldValues.address_out + ', ' + fieldValues.city_out; } return label;",
         "return `${fieldValues.NAME}\\n${fieldValues.ADDRESS}`;",
         'return fieldValues.alsn.trim() != "" ? `${fieldValues.lsn} (${fieldValues.alsn})` : fieldValues.lsn;',
@@ -371,7 +371,7 @@
         "return fieldValues.SPEED_LIMIT_MPH + ' MPH';",
         "return fieldValues.AVG_SPEED + ' MPH';",
         "return label.replace(/((\\w+ )+)(\\d+)$/,'$3 $1').trim();",
-        `label = ""; if (fieldValues.AddNo_Full) { label += fieldValues.AddNo_Full;} if (fieldValues. StNam_Full) { label += ' '+fieldValues. StNam_Full;} if (fieldValues.Post_City) { label += '\\n ' + fieldValues.Post_City;} return label;`,
+        `label = ""; if (fieldValues.AddNo_Full) { label += fieldValues.AddNo_Full;} if (fieldValues.StNam_Full) { label += ' '+fieldValues.StNam_Full;} if (fieldValues.Post_City) { label += '\\n ' + fieldValues.Post_City;} return label;`,
         "label = ''; label += Closure_Type; label += '\\nStart: ' + Start_Date; label += '\\nEnd: ' + End_Date; return label;",
         "return fieldValues.HOUSE_PRE1.trim() + fieldValues.HOUSE_NUM1.trim() + ' ' + fieldValues.HALF1 + ' ' + fieldValues.STREET_DR1 + ' ' + fieldValues.STREET1;",
         "label = fieldValues.abFullStNm; if (fieldValues.SpeedLimit) {  label += ' | SL= ' + fieldValues.SpeedLimit; } return label;",
@@ -455,6 +455,20 @@
             expectedVariables: { a: 3, b: 4, t: 7 }
         }),
         new Test({
+            id: 'LogicalExpression (&&, left = literal, right = variable)',
+            code: "return true && a",
+            variables: { a: true },
+            expectedOutput: true,
+            expectedVariables: { a: true }
+        }),
+        new Test({
+            id: 'LogicalExpression (||, left = literal, right = variable)',
+            code: "return false || a",
+            variables: { a: true },
+            expectedOutput: true,
+            expectedVariables: { a: true }
+        }),
+        new Test({
             id: 'ObjectExpression 1',
             code: "return { b: 1 };",
             variables: { },
@@ -467,6 +481,38 @@
             variables: { d: 'test' },
             expectedOutput: { b: 1, d: 'test' },
             expectedVariables: { d: 'test' }
+        }),
+        new Test({
+            id: 'real test 1',
+            code: "return 'MM ' + Math.round(label).toString()",
+            variables: { label: '32.2' },
+            expectedOutput: 'MM 32',
+            expectedVariables: { }
+        }),
+        new Test({
+            id: 'real test 2',
+            code: "return fieldValues.mission.replace(/^CA-\\w{3}-(\\w{3,10})-\\w{3,6}/,'$1');",
+            variables: { fieldValues: { mission: 'CA-123-abcd-efgh' } },
+            expectedOutput: 'abcd',
+            expectedVariables: { fieldValues: { mission: 'CA-123-abcd-efgh' } }
+        }),
+        new Test({
+            id: 'real test 3',
+            code: "label = ''; cd = new Date(Number(fieldValues.created_date)); label += fieldValues.FULL_NAME +' - ' + cd.toLocaleDateString(); return label;",
+            variables: {
+                fieldValues: {
+                    FULL_NAME: 'TEST RD',
+                    created_date: '159339600000'
+                }
+            },
+            expectedOutput: `TEST RD - ${new Date(159339600000).toLocaleDateString()}`,
+            expectedVariables: {
+                fieldValues: {
+                    FULL_NAME: 'TEST RD',
+                    created_date: '159339600000'
+                },
+                cd: new Date(159339600000)
+            }
         })
     ];
 
@@ -477,7 +523,8 @@
     //         variables: { fieldValues: {} },
     //         expectedOutput: ''
     //     });
-    //     code.matchAll(/fieldValues\.([a-z0-9_]+)/ig).forEach(match => ([, test.variables.fieldValues[match[1]]] = match));
+    //     code.matchAll(/fieldValues\.([a-z0-9_.]+)/ig).forEach(match => ([, test.variables.fieldValues[match[1]]] = match));
+    //     code.matchAll(/fieldValues\[['"]([a-z0-9_.]+)['"]\]/ig).forEach(match => ([, test.variables.fieldValues[match[1]]] = match));
     //     tests.push(test);
     // });
 
@@ -519,7 +566,7 @@
             const validationResult = test.validate(testResult);
             if (SHOW_ALL_RESULTS || !validationResult.outputValidated || !validationResult.variablesValidated) {
                 console.log(`TEST ID:    %c${test.id}`, boldFont);
-                console.log('%cOUTPUT:    ', validationResult.outputValidated ? normal : yellowBackground, testResult.output);
+                console.log('%cOUTPUT:    ', validationResult.outputValidated ? normal : yellowBackground, testResult.output.replace('\n', '\\n'));
                 console.log('%cEXPECTED:  ', validationResult.outputValidated ? normal : yellowBackground, test.expectedOutput);
                 console.log('%cVARIABLES: ', validationResult.variablesValidated ? normal : yellowBackground, testResult.variables);
                 console.log('%cEXPECTED:  ', validationResult.variablesValidated ? normal : yellowBackground, test.expectedVariables);
