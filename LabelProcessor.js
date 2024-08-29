@@ -132,7 +132,7 @@ class LabelProcessor {
                 returnValue = this.processArrowFunctionExpression(node);
                 break;
             default:
-                throw new Error(`Unexpected node type: ${node.type}`);
+                throw new SyntaxError(`Unexpected node type: ${node.type}`);
         }
         this.path.pop();
         return returnValue;
@@ -141,7 +141,7 @@ class LabelProcessor {
     static processObjectExpression(node) {
         const returnValue = {};
         node.properties.forEach(property => {
-            returnValue[property.key.name] = this.processNode(property.value);
+            returnValue[property.key.name] = this.processNode(property.value, node);
         });
         return returnValue;
     }
@@ -163,7 +163,7 @@ class LabelProcessor {
                 returnValue = !this.processNode(node.argument, node);
                 break;
             default:
-                throw new Error(`Unexpected unary expression operator: ${node.operator}`);
+                throw new SyntaxError(`Unexpected unary expression operator: ${node.operator}`);
         }
         return returnValue;
     }
@@ -178,7 +178,7 @@ class LabelProcessor {
                 returnValue = this.processNode(node.left, node) || this.processNode(node.right, node);
                 break;
             default:
-                throw new Error(`Unexpected logical expression operator: ${node.operator}`);
+                throw new SyntaxError(`Unexpected logical expression operator: ${node.operator}`);
         }
         return returnValue;
     }
@@ -277,6 +277,12 @@ class LabelProcessor {
         return returnValue;
     }
 
+    static isNumeric(str) {
+        if (typeof str !== 'string') return false; // we only process strings!
+        return !isNaN(str) // use type coercion to parse the _entirety_ of the string (`parseFloat` alone does not do this)...
+               && !isNaN(parseFloat(str)); // ...and ensure strings of whitespace fail
+    }
+
     static processLiteral(node) {
         return node.value;
     }
@@ -285,6 +291,8 @@ class LabelProcessor {
         switch (context?.type) {
             case esprima.Syntax.BinaryExpression:
             case esprima.Syntax.LogicalExpression:
+            case esprima.Syntax.VariableDeclarator:
+            case esprima.Syntax.ObjectExpression:
                 return this.getTopLevelVariable(node.name);
             default:
                 return node.name;
@@ -355,7 +363,7 @@ class LabelProcessor {
                 break;
             }
             default:
-                throw new Error(`Unexpected member expression object type: ${expression.object.type}`);
+                throw new SyntaxError(`Unexpected member expression object type: ${expression.object.type}`);
         }
         return returnValue;
     }
@@ -400,7 +408,7 @@ class LabelProcessor {
             case '??':
                 throw new SyntaxError('The null coalescing operator (??) is not supported by the label processing engine.');
             default:
-                throw new Error(`Unexpected binary expression operator: ${expression.operator}`);
+                throw new SyntaxError(`Unexpected binary expression operator: ${expression.operator}`);
         }
         return returnValue;
     }
@@ -416,12 +424,16 @@ class LabelProcessor {
                 });
                 break;
             default:
-                throw new Error(`Unexpected variable declaration kind: ${variableDeclaration.type}`);
+                throw new SyntaxError(`Unexpected variable declaration kind: ${variableDeclaration.type}`);
         }
     }
 
-    static processVariableDeclarator(declarator) {
-        return (this.variables[this.processNode(declarator.id)] = this.processNode(declarator.init));
+    static processVariableDeclarator(node) {
+        const name = this.processNode(node.id);
+        if (this.variables.hasOwnProperty(name)) {
+            throw new SyntaxError(`Invalid function declaration. Identifier ${name} has already been declared.`);
+        }
+        return (this.variables[name] = node.init ? this.processNode(node.init, node) : undefined);
     }
 
     static processCallExpression(expression) {
@@ -437,7 +449,7 @@ class LabelProcessor {
                 }
                 methodToCall = calleeObject[callee.property.name];
                 if (!methodToCall) {
-                    throw new Error(`Method not found: ${callee.property.name}`);
+                    throw new SyntaxError(`Method not found: ${callee.property.name}`);
                 }
                 break;
             }
@@ -446,7 +458,7 @@ class LabelProcessor {
                 methodToCall = this.getTopLevelVariable(callee.name);
                 break;
             default:
-                throw new Error(`Unexpected callee type in call expression: ${callee.type}`);
+                throw new SyntaxError(`Unexpected callee type in call expression: ${callee.type}`);
         }
         const args = expression.arguments.map(arg => this.processNode(arg));
         const returnValue = methodToCall.call(calleeObject, ...args);
@@ -465,7 +477,7 @@ class LabelProcessor {
                 break;
             }
             default:
-                throw new Error(`Unexpected type on left side of assignment expression: ${left.type}`);
+                throw new SyntaxError(`Unexpected type on left side of assignment expression: ${left.type}`);
         }
         return returnValue;
     }
@@ -487,7 +499,7 @@ class LabelProcessor {
                 break;
             }
             default:
-                throw new Error(`Unexpected type on left side of assignment expression: ${left.type}`);
+                throw new SyntaxError(`Unexpected type on left side of assignment expression: ${left.type}`);
         }
         return returnValue;
     }
@@ -502,7 +514,7 @@ class LabelProcessor {
                 returnValue = this.plusEquals(expression.left, expression.right);
                 break;
             default:
-                throw new Error(`Unexpected assigment expression operator: ${expression.operator}`);
+                throw new SyntaxError(`Unexpected assigment expression operator: ${expression.operator}`);
         }
         return returnValue;
     }

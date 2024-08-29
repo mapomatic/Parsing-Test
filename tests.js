@@ -9,11 +9,13 @@
 // @author       You
 // @match        https://www.google.com*
 // @grant        none
+// @require      file:///C:\Users\mfreese\source\git\Parsing-Test\Test.js
 // @require      https://cdn.jsdelivr.net/npm/esprima@4/dist/esprima.min.js
 // ==/UserScript==
 
 /* global esprima */
 /* global LabelProcessor */
+/* global Test */
 
 (function main() {
     'use strict';
@@ -21,25 +23,6 @@
     window.esprima = esprima;
     window.LabelProcessor = LabelProcessor;
 
-    class Test {
-        variables;
-
-        constructor(args) {
-            const defaultMapValues = {
-                label: 'DEFAULT_LABEL',
-                W: { map: { getZoom: () => 34 } }
-            };
-            this.id = args.id;
-            this.variables = { ...defaultMapValues, ...args.variables };
-            this.code = args.code;
-            this.expectedOutput = args.expectedOutput;
-        }
-
-        validate(output) {
-            const validated = output === this.expectedOutput;
-            return validated;
-        }
-    }
     const moreTests = [
         "return fieldValues.ARPT_NAME + ' ' + '(' + (fieldValues.NOTAM_ID) + ')';",
         "",
@@ -404,59 +387,147 @@
 
     const tests = [
         new Test({
-            id: 1,
-            code: "return 'MM ' + Math.round(label).toString()",
-            variables: { label: '32', fieldValues: { v: '5' } },
-            expectedOutput: 'DLT_LABEL'
+            id: 'ReturnStatement (literal)',
+            code: "return 3;",
+            variables: { },
+            expectedOutput: 3,
+            expectedVariables: { }
         }),
         new Test({
-            id: 2,
-            code: 'var test1 = t1 => t1; var test2 = t2 => { return t2; }; return test1(1) + test2(2);',
-            variables: {
-                fieldValues: {
-                    LOCALE_NAME: 'MY LOCALE',
-                    ADDRESS: '208 TEST DR',
-                    CITY: 'LEXINGTON',
-                    STATE: 'KY',
-                    ZIP_CODE: '40514'
-                }
-            },
-            expectedOutput: 'MY LOCALE (Post Office)\n208 TEST DR, LEXINGTON, KY 40514'
+            id: 'ReturnStatement (variable literal)',
+            code: "return a;",
+            variables: { a: 3 },
+            expectedOutput: 3,
+            expectedVariables: { a: 3 }
+        }),
+        new Test({
+            id: 'VariableDeclaration (no init)',
+            code: "var t;",
+            variables: { },
+            expectedOutput: undefined,
+            expectedVariables: { t: undefined }
+        }),
+        new Test({
+            id: 'VariableDeclaration (error - reassigned)',
+            code: "var t;",
+            variables: { t: 2 },
+            expectedOutput: { errorType: SyntaxError, message: 'Invalid function declaration. Identifier t has already been declared.' }
+        }),
+        new Test({
+            id: 'AssignmentExpression (assign literal to variable)',
+            code: "t = 3;",
+            variables: { t: undefined },
+            expectedOutput: 3,
+            expectedVariables: { t: 3 }
+        }),
+        new Test({
+            id: 'VariableDeclaration (with assignment literal init)',
+            code: "var t = 3;",
+            variables: { },
+            expectedOutput: undefined,
+            expectedVariables: { t: 3 }
+        }),
+        new Test({
+            id: 'VariableDeclaration (with assignment, variable init)',
+            code: "var t = a;",
+            variables: { a: 3 },
+            expectedOutput: undefined,
+            expectedVariables: { t: 3, a: 3 }
+        }),
+        new Test({
+            id: 'BinaryExpression (+, left = literal, right = literal)',
+            code: "var t = 3 + 1; return t",
+            variables: { },
+            expectedOutput: 4
+        }),
+        new Test({
+            id: 'BinaryExpression (+, left = variable, right = literal)',
+            code: "var t = a + 1",
+            variables: { a: 3 },
+            expectedOutput: undefined,
+            expectedVariables: { a: 3, t: 4 }
+        }),
+        new Test({
+            id: 'BinaryExpression (+, left = variable, right = variable)',
+            code: "var b = 4; var t = a + b;",
+            variables: { a: 3 },
+            expectedOutput: undefined,
+            expectedVariables: { a: 3, b: 4, t: 7 }
+        }),
+        new Test({
+            id: 'ObjectExpression 1',
+            code: "return { b: 1 };",
+            variables: { },
+            expectedOutput: { b: 1 },
+            expectedVariables: { }
+        }),
+        new Test({
+            id: 'ObjectExpression 2',
+            code: "return { b: 1, d };",
+            variables: { d: 'test' },
+            expectedOutput: { b: 1, d: 'test' },
+            expectedVariables: { d: 'test' }
         })
     ];
 
-    moreTests.forEach((code, index) => {
-        const test = new Test({
-            id: 3 + index,
-            code,
-            variables: { fieldValues: {} },
-            expectedOutput: ''
-        });
-        code.matchAll(/fieldValues\.([a-z0-9_]+)/ig).forEach(match => ([, test.variables.fieldValues[match[1]]] = match));
-        tests.push(test);
-    });
+    // moreTests.forEach((code, index) => {
+    //     const test = new Test({
+    //         id: 3 + index,
+    //         code,
+    //         variables: { fieldValues: {} },
+    //         expectedOutput: ''
+    //     });
+    //     code.matchAll(/fieldValues\.([a-z0-9_]+)/ig).forEach(match => ([, test.variables.fieldValues[match[1]]] = match));
+    //     tests.push(test);
+    // });
 
-    const ONLY_RUN_TEST_ID = 1;
-    let errorCount = 0;
+    const ONLY_RUN_TEST_ID = null;
+    const SHOW_ALL_RESULTS = false;
+    const yellowBackground = 'background-color: yellow';
+    const boldFont = 'font-weight: bold';
+    const normal = '';
+
+    let testCount = 0;
+    const testIds = [];
 
     tests.forEach(test => {
         let tree;
-
         try {
-            if (ONLY_RUN_TEST_ID >= 0 && test.id !== ONLY_RUN_TEST_ID) return;
+            if (testIds.includes(test.id)) {
+                throw new Error('Repeated Test ID');
+            }
+            testIds.push(test.id);
+            if (ONLY_RUN_TEST_ID && test.id !== ONLY_RUN_TEST_ID) return;
+            testCount++;
             tree = LabelProcessor.parseLabelScript(test.code);
 
-            const result = LabelProcessor.process(tree, test.variables);
-            const validated = test.validate(result.output);
-            console.log(`Test ${test.id} validated = ${validated}`);
-            if (!validated) {
-                console.log(test);
-                console.log(tree);
-                console.log(`output = ${result.output}`);
-                console.log('variables:', result.variables);
+            let testResult;
+            try {
+                testResult = LabelProcessor.process(tree, test.variables);
+            } catch (ex) {
+                testResult = { output: ex, variables: test.variables };
+            }
+
+            // Filter out the default variables first
+            const testResultVariables = {};
+            Object.keys(testResult.variables)
+                .filter(key => !LabelProcessor.DEFAULT_VARIABLES.hasOwnProperty(key) && !Test.DEFAULT_VARIABLES.hasOwnProperty(key))
+                .forEach(key => (testResultVariables[key] = testResult.variables[key]));
+            delete testResultVariables.__$lp; // remove the program function variable
+            testResult.variables = testResultVariables;
+
+            const validationResult = test.validate(testResult);
+            if (SHOW_ALL_RESULTS || !validationResult.outputValidated || !validationResult.variablesValidated) {
+                console.log(`TEST ID:    %c${test.id}`, boldFont);
+                console.log('%cOUTPUT:    ', validationResult.outputValidated ? normal : yellowBackground, testResult.output);
+                console.log('%cEXPECTED:  ', validationResult.outputValidated ? normal : yellowBackground, test.expectedOutput);
+                console.log('%cVARIABLES: ', validationResult.variablesValidated ? normal : yellowBackground, testResult.variables);
+                console.log('%cEXPECTED:  ', validationResult.variablesValidated ? normal : yellowBackground, test.expectedVariables);
+                console.log('TEST:      ', test);
+                console.log('TREE:      ', tree);
+                console.log('\n\n');
             }
         } catch (ex) {
-            errorCount++;
             console.error(`Error in test "${test.id}"`, ex);
             console.log(test);
             console.log(tree);
@@ -474,6 +545,5 @@
         //     // skip it
         // }
     });
-    console.log('');
-    console.log(`ERROR COUNT: ${errorCount}`);
+    console.log(`TESTS COMPLETED: ${testCount}`);
 })();
