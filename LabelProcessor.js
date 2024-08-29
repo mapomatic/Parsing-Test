@@ -1,5 +1,5 @@
 // name         LabelProcessor
-// namespace    https://greasyfork.org/users/45389
+// namespace    https://github.com/mapomatic
 // version      1.0.0
 // description  Converts simple text scripts into executable JS (for use with WME GIS Layers userscript)
 // author       MapOMatic
