@@ -9,18 +9,17 @@
 // @author       You
 // @match        https://www.google.com*
 // @grant        none
-// @require      file:///C:\Users\mfreese\source\git\Parsing-Test\Test.js
-// @require      https://cdn.jsdelivr.net/npm/esprima@4/dist/esprima.min.js
+// @require      https://cdn.jsdelivr.net/npm/esprima-next@6/dist/esprima.min.js
+// @require      https://github.com/mapomatic/Parsing-Test/raw/main/LabelProcessor.js
+// @require      https://github.com/mapomatic/Parsing-Test/raw/main/Test.js
 // ==/UserScript==
 
-/* global esprima */
 /* global LabelProcessor */
 /* global Test */
 
 (function main() {
     'use strict';
 
-    window.esprima = esprima;
     window.LabelProcessor = LabelProcessor;
 
     const moreTests = [
@@ -408,6 +407,118 @@
             expectedVariables: { t: undefined }
         }),
         new Test({
+            id: '&&',
+            code: "return true && false;",
+            variables: { },
+            expectedOutput: false,
+            expectedVariables: { }
+        }),
+        new Test({
+            id: '||',
+            code: "return true || false;",
+            variables: { },
+            expectedOutput: true,
+            expectedVariables: { }
+        }),
+        new Test({
+            id: '+',
+            code: "return 3 + 1;",
+            variables: { },
+            expectedOutput: 4,
+            expectedVariables: { }
+        }),
+        new Test({
+            id: '-',
+            code: "return 3 - 1;",
+            variables: { },
+            expectedOutput: 2,
+            expectedVariables: { }
+        }),
+        new Test({
+            id: '*',
+            code: "return 3 * 2;",
+            variables: { },
+            expectedOutput: 6,
+            expectedVariables: { }
+        }),
+        new Test({
+            id: '/',
+            code: "return 3 / 2;",
+            variables: { },
+            expectedOutput: 3 / 2,
+            expectedVariables: { }
+        }),
+        new Test({
+            id: '%',
+            code: "return 3 % 2;",
+            variables: { },
+            expectedOutput: 1,
+            expectedVariables: { }
+        }),
+        new Test({
+            id: '**',
+            code: "return 3 ** 2;",
+            variables: { },
+            expectedOutput: 9,
+            expectedVariables: { }
+        }),
+        new Test({
+            id: '&&=',
+            code: "return a &&= false;",
+            variables: { a: true },
+            expectedOutput: false,
+            expectedVariables: { a: false }
+        }),
+        new Test({
+            id: '||=',
+            code: "return a ||= false;",
+            variables: { a: true },
+            expectedOutput: true,
+            expectedVariables: { a: true }
+        }),
+        new Test({
+            id: '+=',
+            code: "return a += 1;",
+            variables: { a: 3 },
+            expectedOutput: 4,
+            expectedVariables: { a: 4 }
+        }),
+        new Test({
+            id: '-=',
+            code: "return a -= 1;",
+            variables: { a: 3 },
+            expectedOutput: 2,
+            expectedVariables: { a: 2 }
+        }),
+        new Test({
+            id: '*=',
+            code: "return a *= 2;",
+            variables: { a: 3 },
+            expectedOutput: 6,
+            expectedVariables: { a: 6 }
+        }),
+        new Test({
+            id: '/=',
+            code: "return a /= 2;",
+            variables: { a: 3 },
+            expectedOutput: 1.5,
+            expectedVariables: { a: 1.5 }
+        }),
+        new Test({
+            id: '%=',
+            code: "return a %= 2;",
+            variables: { a: 3 },
+            expectedOutput: 1,
+            expectedVariables: { a: 1 }
+        }),
+        new Test({
+            id: '**=',
+            code: "return a **= 2;",
+            variables: { a: 3 },
+            expectedOutput: 9,
+            expectedVariables: { a: 9 }
+        }),
+        new Test({
             id: 'VariableDeclaration (error - reassigned)',
             code: "var t;",
             variables: { t: 2 },
@@ -580,7 +691,7 @@
             const validationResult = test.validate(testResult);
             if (SHOW_ALL_RESULTS || !validationResult.outputValidated || !validationResult.variablesValidated) {
                 console.log(`TEST ID:    %c${test.id}`, boldFont);
-                console.log('%cOUTPUT:    ', validationResult.outputValidated ? normal : yellowBackground, testResult.output.replace('\n', '\\n'));
+                console.log('%cOUTPUT:    ', validationResult.outputValidated ? normal : yellowBackground, testResult.output); // .replace('\n', '\\n'));
                 console.log('%cEXPECTED:  ', validationResult.outputValidated ? normal : yellowBackground, test.expectedOutput);
                 console.log('%cVARIABLES: ', validationResult.variablesValidated ? normal : yellowBackground, testResult.variables);
                 console.log('%cEXPECTED:  ', validationResult.variablesValidated ? normal : yellowBackground, test.expectedVariables);

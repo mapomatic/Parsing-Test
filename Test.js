@@ -20,8 +20,9 @@ class Test {
     validate(testResult) {
         const validationResult = { outputValidated: false, variablesValidated: false };
         if (this.expectedOutput) {
-            if (testResult.output instanceof Error) {
-                validationResult.outputValidated = testResult.output instanceof this.expectedOutput.errorType
+            if (typeof testResult.output === 'object' && testResult.output instanceof Error) {
+                validationResult.outputValidated = typeof this.expectedOutput === 'object'
+                    && testResult.output instanceof this.expectedOutput.errorType
                     && testResult.output.message === this.expectedOutput.message;
             } else {
                 validationResult.outputValidated = JSON.stringify(testResult.output) === JSON.stringify(this.expectedOutput);
