@@ -7,8 +7,7 @@
 // license      GNU GPLv3
 // ==/UserScript==
 
-// NOTE: The esprima library must be included to use this, e.g.:
-// @require  https://cdn.jsdelivr.net/npm/esprima@4/dist/esprima.min.js
+// NOTE: The esprima-next library is required to use this.
 
 // TODO: Missing syntax:
 //  ArrowFunctionExpression
@@ -97,7 +96,7 @@ class LabelProcessor {
                 returnValue = this.processVariableDeclarator(node);
                 break;
             case esprima.Syntax.CallExpression:
-                returnValue = this.processCallExpression(node);
+                returnValue = this.processCallExpression(node, context);
                 break;
             case esprima.Syntax.AssignmentExpression:
                 returnValue = this.processAssigmentExpression(node);
@@ -143,6 +142,9 @@ class LabelProcessor {
                 break;
             case esprima.Syntax.ArrowFunctionExpression:
                 returnValue = this.processArrowFunctionExpression(node);
+                break;
+            case esprima.Syntax.ChainExpression:
+                returnValue = this.processChainExpression(node);
                 break;
             default:
                 throw new SyntaxError(`Unexpected node type: ${node.type}`);
@@ -190,6 +192,9 @@ class LabelProcessor {
             case '||':
                 returnValue = this.processNode(node.left, node) || this.processNode(node.right, node);
                 break;
+            case '??':
+                returnValue = this.processNode(node.left, node) ?? this.processNode(node.right, node);
+                break;
             default:
                 throw new SyntaxError(`Unexpected logical expression operator: ${node.operator}`);
         }
@@ -211,6 +216,10 @@ class LabelProcessor {
 
     static processArrowFunctionExpression() {
         throw new SyntaxError('Arrow functions are not supported yet.');
+    }
+
+    static processChainExpression(node) {
+        return this.processNode(node.expression, node);
     }
 
     static processFunctionDeclaration(node) {
@@ -360,7 +369,7 @@ class LabelProcessor {
         return object[propertyName];
     }
 
-    static performBinaryExpression(node, func) {
+    static doBinaryExpression(node, func) {
         return func(this.processNode(node.left, node), this.processNode(node.right, node));
     }
 
@@ -392,43 +401,41 @@ class LabelProcessor {
         let returnValue;
         switch (expression.operator) {
             case '+':
-                returnValue = this.performBinaryExpression(expression, this.add);
+                returnValue = this.doBinaryExpression(expression, this.add);
                 break;
             case '-':
-                returnValue = this.performBinaryExpression(expression, this.subtract);
+                returnValue = this.doBinaryExpression(expression, this.subtract);
                 break;
             case '*':
-                returnValue = this.performBinaryExpression(expression, this.multiply);
+                returnValue = this.doBinaryExpression(expression, this.multiply);
                 break;
             case '/':
-                returnValue = this.performBinaryExpression(expression, this.divide);
+                returnValue = this.doBinaryExpression(expression, this.divide);
                 break;
             case '%':
-                returnValue = this.performBinaryExpression(expression, this.mod);
+                returnValue = this.doBinaryExpression(expression, this.mod);
                 break;
             case '**':
-                returnValue = this.performBinaryExpression(expression, this.power);
+                returnValue = this.doBinaryExpression(expression, this.power);
                 break;
             case '==':
-                returnValue = this.performBinaryExpression(expression, (left, right) => left == right);
+                returnValue = this.doBinaryExpression(expression, (left, right) => left == right);
                 break;
             case '===':
-                returnValue = this.performBinaryExpression(expression, (left, right) => left === right);
+                returnValue = this.doBinaryExpression(expression, (left, right) => left === right);
                 break;
             case '>=':
-                returnValue = this.performBinaryExpression(expression, (left, right) => left >= right);
+                returnValue = this.doBinaryExpression(expression, (left, right) => left >= right);
                 break;
             case '<=':
-                returnValue = this.performBinaryExpression(expression, (left, right) => left <= right);
+                returnValue = this.doBinaryExpression(expression, (left, right) => left <= right);
                 break;
             case '!=':
-                returnValue = this.performBinaryExpression(expression, (left, right) => left != right);
+                returnValue = this.doBinaryExpression(expression, (left, right) => left != right);
                 break;
             case '!==':
-                returnValue = this.performBinaryExpression(expression, (left, right) => left !== right);
+                returnValue = this.doBinaryExpression(expression, (left, right) => left !== right);
                 break;
-            case '??':
-                throw new SyntaxError('The null coalescing operator (??) is not supported by the label processing engine.');
             default:
                 throw new SyntaxError(`Unexpected binary expression operator: ${expression.operator}`);
         }
@@ -458,7 +465,7 @@ class LabelProcessor {
         return (this.variables[name] = node.init ? this.processNode(node.init, node) : undefined);
     }
 
-    static processCallExpression(expression) {
+    static processCallExpression(expression, context) {
         const { callee } = expression;
         let methodToCall;
         let calleeObject;
@@ -471,6 +478,9 @@ class LabelProcessor {
                 }
                 methodToCall = calleeObject[callee.property.name];
                 if (!methodToCall) {
+                    if (context && context.type === esprima.Syntax.ChainExpression) {
+                        return undefined;
+                    }
                     throw new SyntaxError(`Method not found: ${callee.property.name}`);
                 }
                 break;
@@ -504,7 +514,7 @@ class LabelProcessor {
         return returnValue;
     }
 
-    static performAssignmentExpression(node, func) {
+    static doAssignmentExpression(node, func) {
         let returnValue;
         let leftValue;
         switch (node.left.type) {
@@ -546,34 +556,31 @@ class LabelProcessor {
                 returnValue = this.equals(node.left, node.right, node);
                 break;
             case '+=':
-                returnValue = this.performAssignmentExpression(node, this.add);
+                returnValue = this.doAssignmentExpression(node, this.add);
                 break;
             case '-=':
-                returnValue = this.performAssignmentExpression(node, this.subtract);
+                returnValue = this.doAssignmentExpression(node, this.subtract);
                 break;
             case '*=':
-                returnValue = this.performAssignmentExpression(node, this.multiply);
+                returnValue = this.doAssignmentExpression(node, this.multiply);
                 break;
             case '/=':
-                returnValue = this.performAssignmentExpression(node, this.divide);
+                returnValue = this.doAssignmentExpression(node, this.divide);
                 break;
             case '%=':
-                returnValue = this.performAssignmentExpression(node, this.mod);
+                returnValue = this.doAssignmentExpression(node, this.mod);
                 break;
             case '**=':
-                returnValue = this.performAssignmentExpression(node, this.power);
+                returnValue = this.doAssignmentExpression(node, this.power);
                 break;
             case '??=':
-                // NOT SUPPORTED BY ESPRIMA v4
-                returnValue = this.performAssignmentExpression(node, this.nullishCoalesce);
+                returnValue = this.doAssignmentExpression(node, this.nullishCoalesce);
                 break;
             case '||=':
-                // NOT SUPPORTED BY ESPRIMA v4
-                returnValue = this.performAssignmentExpression(node, this.or);
+                returnValue = this.doAssignmentExpression(node, this.or);
                 break;
             case '&&=':
-                // NOT SUPPORTED BY ESPRIMA v4
-                returnValue = this.performAssignmentExpression(node, this.and);
+                returnValue = this.doAssignmentExpression(node, this.and);
                 break;
             default:
                 throw new SyntaxError(`Unexpected assigment expression operator: ${node.operator}`);

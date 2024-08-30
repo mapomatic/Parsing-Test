@@ -463,6 +463,13 @@
             expectedVariables: { }
         }),
         new Test({
+            id: '??',
+            code: "return null ?? 2;",
+            variables: { },
+            expectedOutput: 2,
+            expectedVariables: { }
+        }),
+        new Test({
             id: '&&=',
             code: "return a &&= false;",
             variables: { a: true },
@@ -517,6 +524,27 @@
             variables: { a: 3 },
             expectedOutput: 9,
             expectedVariables: { a: 9 }
+        }),
+        new Test({
+            id: '??=',
+            code: "return a ??= 2;",
+            variables: { a: null },
+            expectedOutput: 2,
+            expectedVariables: { a: 2 }
+        }),
+        new Test({
+            id: '?. #1',
+            code: "return a?.doesntExist()",
+            variables: { a: { } },
+            expectedOutput: undefined,
+            expectedVariables: { a: { } }
+        }),
+        new Test({
+            id: '?. #2',
+            code: "return a?.doesExist()",
+            variables: { a: { doesExist: () => 3 } },
+            expectedOutput: 3,
+            expectedVariables: { a: { doesExist: () => 3 } }
         }),
         new Test({
             id: 'VariableDeclaration (error - reassigned)',
@@ -653,7 +681,7 @@
     //     tests.push(test);
     // });
 
-    const ONLY_RUN_TEST_ID = null;
+    const ONLY_RUN_TEST_ID = '';
     const SHOW_ALL_RESULTS = false;
     const yellowBackground = 'background-color: yellow';
     const boldFont = 'font-weight: bold';
@@ -689,7 +717,7 @@
             testResult.variables = testResultVariables;
 
             const validationResult = test.validate(testResult);
-            if (SHOW_ALL_RESULTS || !validationResult.outputValidated || !validationResult.variablesValidated) {
+            if (SHOW_ALL_RESULTS || !validationResult.outputValidated || !validationResult.variablesValidated || ONLY_RUN_TEST_ID) {
                 console.log(`TEST ID:    %c${test.id}`, boldFont);
                 console.log('%cOUTPUT:    ', validationResult.outputValidated ? normal : yellowBackground, testResult.output); // .replace('\n', '\\n'));
                 console.log('%cEXPECTED:  ', validationResult.outputValidated ? normal : yellowBackground, test.expectedOutput);
