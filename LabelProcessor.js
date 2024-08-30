@@ -301,6 +301,7 @@ class LabelProcessor {
 
     static processIdentifier(node, context) {
         switch (context?.type) {
+            case esprima.Syntax.AssignmentExpression:
             case esprima.Syntax.BinaryExpression:
             case esprima.Syntax.LogicalExpression:
             case esprima.Syntax.VariableDeclarator:
@@ -495,20 +496,20 @@ class LabelProcessor {
         return returnValue;
     }
 
-    static plusEquals(left, right) {
+    static plusEqual(left, right, context) {
         let returnValue;
         let leftValue;
         switch (left.type) {
             case esprima.Syntax.Identifier: {
                 leftValue = this.getTopLevelVariable(left.name);
-                returnValue = this.setTopLevelVariable(left.name, leftValue + this.processNode(right));
+                returnValue = this.setTopLevelVariable(left.name, leftValue + this.processNode(right, context));
                 break;
             }
             case esprima.Syntax.MemberExpression: {
                 const object = this.getMemberExpressionObject(left);
                 const propertyName = this.processNode(left.property);
                 leftValue = object[propertyName];
-                returnValue = (object[propertyName] = leftValue + this.processNode(right));
+                returnValue = (object[propertyName] = leftValue + this.processNode(right, context));
                 break;
             }
             default:
@@ -517,17 +518,217 @@ class LabelProcessor {
         return returnValue;
     }
 
-    static processAssigmentExpression(expression) {
+    static minusEqual(left, right, context) {
         let returnValue;
-        switch (expression.operator) {
+        let leftValue;
+        switch (left.type) {
+            case esprima.Syntax.Identifier: {
+                leftValue = this.getTopLevelVariable(left.name);
+                returnValue = this.setTopLevelVariable(left.name, leftValue - this.processNode(right, context));
+                break;
+            }
+            case esprima.Syntax.MemberExpression: {
+                const object = this.getMemberExpressionObject(left);
+                const propertyName = this.processNode(left.property);
+                leftValue = object[propertyName];
+                returnValue = (object[propertyName] = leftValue - this.processNode(right, context));
+                break;
+            }
+            default:
+                throw new SyntaxError(`Unexpected type on left side of assignment expression: ${left.type}`);
+        }
+        return returnValue;
+    }
+
+    static multiplyEqual(left, right, context) {
+        let returnValue;
+        let leftValue;
+        switch (left.type) {
+            case esprima.Syntax.Identifier: {
+                leftValue = this.getTopLevelVariable(left.name);
+                returnValue = this.setTopLevelVariable(left.name, leftValue * this.processNode(right, context));
+                break;
+            }
+            case esprima.Syntax.MemberExpression: {
+                const object = this.getMemberExpressionObject(left);
+                const propertyName = this.processNode(left.property);
+                leftValue = object[propertyName];
+                returnValue = (object[propertyName] = leftValue * this.processNode(right, context));
+                break;
+            }
+            default:
+                throw new SyntaxError(`Unexpected type on left side of assignment expression: ${left.type}`);
+        }
+        return returnValue;
+    }
+
+    static divideEqual(left, right, context) {
+        let returnValue;
+        let leftValue;
+        switch (left.type) {
+            case esprima.Syntax.Identifier: {
+                leftValue = this.getTopLevelVariable(left.name);
+                returnValue = this.setTopLevelVariable(left.name, leftValue / this.processNode(right, context));
+                break;
+            }
+            case esprima.Syntax.MemberExpression: {
+                const object = this.getMemberExpressionObject(left);
+                const propertyName = this.processNode(left.property);
+                leftValue = object[propertyName];
+                returnValue = (object[propertyName] = leftValue / this.processNode(right, context));
+                break;
+            }
+            default:
+                throw new SyntaxError(`Unexpected type on left side of assignment expression: ${left.type}`);
+        }
+        return returnValue;
+    }
+
+    static remainderEqual(left, right, context) {
+        let returnValue;
+        let leftValue;
+        switch (left.type) {
+            case esprima.Syntax.Identifier: {
+                leftValue = this.getTopLevelVariable(left.name);
+                returnValue = this.setTopLevelVariable(left.name, leftValue % this.processNode(right, context));
+                break;
+            }
+            case esprima.Syntax.MemberExpression: {
+                const object = this.getMemberExpressionObject(left);
+                const propertyName = this.processNode(left.property);
+                leftValue = object[propertyName];
+                returnValue = (object[propertyName] = leftValue % this.processNode(right, context));
+                break;
+            }
+            default:
+                throw new SyntaxError(`Unexpected type on left side of assignment expression: ${left.type}`);
+        }
+        return returnValue;
+    }
+
+    static exponentiationEqual(left, right, context) {
+        let returnValue;
+        let leftValue;
+        switch (left.type) {
+            case esprima.Syntax.Identifier: {
+                leftValue = this.getTopLevelVariable(left.name);
+                returnValue = this.setTopLevelVariable(left.name, leftValue ** this.processNode(right, context));
+                break;
+            }
+            case esprima.Syntax.MemberExpression: {
+                const object = this.getMemberExpressionObject(left);
+                const propertyName = this.processNode(left.property);
+                leftValue = object[propertyName];
+                returnValue = (object[propertyName] = leftValue ** this.processNode(right, context));
+                break;
+            }
+            default:
+                throw new SyntaxError(`Unexpected type on left side of assignment expression: ${left.type}`);
+        }
+        return returnValue;
+    }
+
+    static nullishCoalescingEqual(left, right, context) {
+        let returnValue;
+        let leftValue;
+        switch (left.type) {
+            case esprima.Syntax.Identifier: {
+                leftValue = this.getTopLevelVariable(left.name);
+                returnValue = this.setTopLevelVariable(left.name, leftValue ?? this.processNode(right, context));
+                break;
+            }
+            case esprima.Syntax.MemberExpression: {
+                const object = this.getMemberExpressionObject(left);
+                const propertyName = this.processNode(left.property);
+                leftValue = object[propertyName];
+                returnValue = (object[propertyName] = leftValue ?? this.processNode(right, context));
+                break;
+            }
+            default:
+                throw new SyntaxError(`Unexpected type on left side of assignment expression: ${left.type}`);
+        }
+        return returnValue;
+    }
+
+    static orEqual(left, right, context) {
+        let returnValue;
+        let leftValue;
+        switch (left.type) {
+            case esprima.Syntax.Identifier: {
+                leftValue = this.getTopLevelVariable(left.name);
+                returnValue = this.setTopLevelVariable(left.name, leftValue || this.processNode(right, context));
+                break;
+            }
+            case esprima.Syntax.MemberExpression: {
+                const object = this.getMemberExpressionObject(left);
+                const propertyName = this.processNode(left.property);
+                leftValue = object[propertyName];
+                returnValue = (object[propertyName] = leftValue || this.processNode(right, context));
+                break;
+            }
+            default:
+                throw new SyntaxError(`Unexpected type on left side of assignment expression: ${left.type}`);
+        }
+        return returnValue;
+    }
+
+    static andEqual(left, right, context) {
+        let returnValue;
+        let leftValue;
+        switch (left.type) {
+            case esprima.Syntax.Identifier: {
+                leftValue = this.getTopLevelVariable(left.name);
+                returnValue = this.setTopLevelVariable(left.name, leftValue && this.processNode(right, context));
+                break;
+            }
+            case esprima.Syntax.MemberExpression: {
+                const object = this.getMemberExpressionObject(left);
+                const propertyName = this.processNode(left.property);
+                leftValue = object[propertyName];
+                returnValue = (object[propertyName] = leftValue && this.processNode(right, context));
+                break;
+            }
+            default:
+                throw new SyntaxError(`Unexpected type on left side of assignment expression: ${left.type}`);
+        }
+        return returnValue;
+    }
+
+    static processAssigmentExpression(node) {
+        let returnValue;
+        switch (node.operator) {
             case '=':
-                returnValue = this.equals(expression.left, expression.right);
+                returnValue = this.equals(node.left, node.right, node);
                 break;
             case '+=':
-                returnValue = this.plusEquals(expression.left, expression.right);
+                returnValue = this.plusEqual(node.left, node.right, node);
+                break;
+            case '-=':
+                returnValue = this.minusEqual(node.left, node.right, node);
+                break;
+            case '*=':
+                returnValue = this.multiplyEqual(node.left, node.right, node);
+                break;
+            case '/=':
+                returnValue = this.divideEqual(node.left, node.right, node);
+                break;
+            case '%=':
+                returnValue = this.remainderEqual(node.left, node.right, node);
+                break;
+            case '**=':
+                returnValue = this.exponentiationEqual(node.left, node.right, node);
+                break;
+            case '??=':
+                returnValue = this.nullishCoalescingEqual(node.left, node.right, node);
+                break;
+            case '||=':
+                returnValue = this.orEqual(node.left, node.right, node);
+                break;
+            case '&&=':
+                returnValue = this.andEqual(node.left, node.right, node);
                 break;
             default:
-                throw new SyntaxError(`Unexpected assigment expression operator: ${expression.operator}`);
+                throw new SyntaxError(`Unexpected assigment expression operator: ${node.operator}`);
         }
         return returnValue;
     }

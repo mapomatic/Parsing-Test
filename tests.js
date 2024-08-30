@@ -513,6 +513,20 @@
                 },
                 cd: new Date(159339600000)
             }
+        }),
+        new Test({
+            id: 'AssignmentExpression (+=, left variable, right literal)',
+            code: "return a += 3;",
+            variables: { a: 1 },
+            expectedOutput: 4,
+            expectedVariables: { a: 4 }
+        }),
+        new Test({
+            id: 'AssignmentExpression (+=, left variable, right variable)',
+            code: "return a += a;",
+            variables: { a: 1 },
+            expectedOutput: 2,
+            expectedVariables: { a: 2 }
         })
     ];
 
