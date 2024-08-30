@@ -560,7 +560,13 @@
             id: 'VariableDeclaration (error - reassigned)',
             code: "let t; let t;",
             variables: { t: undefined },
-            expectedOutput: { errorType: SyntaxError, message: 'Invalid function declaration. Identifier t has already been declared.' }
+            expectedOutput: { errorType: SyntaxError, message: "Identifier 't' has already been declared" }
+        }),
+        new Test({
+            id: 'reassign error in function',
+            code: "function test(t) { let t = 45; } test(1);",
+            variables: { t: undefined },
+            expectedOutput: { errorType: SyntaxError, message: "Identifier 't' has already been declared" }
         }),
         new Test({
             id: 'AssignmentExpression (assign literal to variable)',

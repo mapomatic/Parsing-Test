@@ -204,13 +204,7 @@ class LabelProcessor {
         let returnValue;
         switch (node.type) {
             case esprima.Syntax.Program:
-                VariableContainer.addScope(VariableContainer.ScopeType.Global);
-                // Add global variables
-                Object.keys(this.globalVariables).forEach(key => {
-                    VariableContainer.declare(VariableContainer.VariableType.Let, key, this.globalVariables[key]);
-                });
                 returnValue = this.processProgram(node);
-                VariableContainer.removeCurrentScope();
                 break;
             case esprima.Syntax.ExpressionStatement:
                 returnValue = this.processNode(node.expression);
@@ -243,9 +237,7 @@ class LabelProcessor {
                 returnValue = this.processIfStatement(node);
                 break;
             case esprima.Syntax.BlockStatement:
-                VariableContainer.addScope(VariableContainer.ScopeType.Block);
-                returnValue = this.processBlockStatement(node);
-                VariableContainer.removeCurrentScope();
+                returnValue = this.processBlockStatement(node, context);
                 break;
             case esprima.Syntax.EmptyStatement:
                 // do nothing;
@@ -365,9 +357,15 @@ class LabelProcessor {
 
     static processProgram(node) {
         let returnValue;
-        node.body.forEach(childNode => {
-            returnValue = this.processNode(childNode);
+        VariableContainer.addScope(VariableContainer.ScopeType.Global);
+        // Add global variables
+        Object.keys(this.globalVariables).forEach(key => {
+            VariableContainer.declare(VariableContainer.VariableType.Let, key, this.globalVariables[key]);
         });
+        node.body.forEach(childNode => {
+            returnValue = this.processNode(childNode, node);
+        });
+        VariableContainer.removeCurrentScope();
         return returnValue;
     }
 
@@ -391,8 +389,15 @@ class LabelProcessor {
         return returnValue;
     }
 
-    static processBlockStatement(node) {
+    static processBlockStatement(node, context) {
         let returnValue;
+        switch (context.type) {
+            case esprima.Syntax.FunctionDeclaration:
+                break;
+            default:
+                VariableContainer.addScope(VariableContainer.ScopeType.Block);
+        }
+
         for (let i = 0; i < node.body.length; i++) {
             const childNode = node.body[i];
             returnValue = this.processNode(childNode);
@@ -400,6 +405,13 @@ class LabelProcessor {
                 node.returnCalled = true;
                 break;
             }
+        }
+
+        switch (context.type) {
+            case esprima.Syntax.FunctionDeclaration:
+                break;
+            default:
+                VariableContainer.removeCurrentScope();
         }
         return returnValue;
     }
@@ -612,9 +624,13 @@ class LabelProcessor {
         if (methodToCall.type === esprima.Syntax.FunctionDeclaration) {
             VariableContainer.addScope(VariableContainer.ScopeType.Function);
             for (let i = 0; i < Math.min(node.arguments.length, methodToCall.params.length); i++) {
-                VariableContainer.declare(VariableContainer.VariableType.Var, methodToCall.params[i], this.processNode(node.arguments[i], node));
+                VariableContainer.declare(
+                    VariableContainer.VariableType.Var,
+                    this.processNode(methodToCall.params[i]),
+                    this.processNode(node.arguments[i], node)
+                );
             }
-            returnValue = this.processNode(methodToCall.body);
+            returnValue = this.processNode(methodToCall.body, methodToCall);
             VariableContainer.removeCurrentScope();
         } else {
             const args = node.arguments.map(arg => this.processNode(arg, node));
