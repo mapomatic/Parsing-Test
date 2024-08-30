@@ -23,6 +23,134 @@
 /* global esprima */
 
 // eslint-disable-next-line no-unused-vars
+class VariableContainer {
+    static currentScope;
+    static scopeHistory = [];
+    static debug = false;
+
+    static ScopeType = {
+        Global: 'Global',
+        Function: 'Function',
+        Block: 'Block'
+    };
+
+    static VariableType = {
+        Let: 'Let',
+        Const: 'Const',
+        Var: 'Var'
+    };
+
+    constructor() {
+        throw new SyntaxError('Cannot call new on the Scope class.');
+    }
+
+    static reset() {
+        this.scopeHistory = [];
+        this.currentScope = undefined;
+    }
+
+    /**
+     *
+     * @param {ScopeType} type
+     */
+    static addScope(type) {
+        const scope = {
+            parentScope: this.currentScope,
+            v: {},
+            type
+        };
+        this.currentScope = scope;
+    }
+
+    static removeCurrentScope() {
+        if (this.debug) {
+            this.scopeHistory.push(this.currentScope);
+        }
+        this.currentScope = this.currentScope.parentScope;
+    }
+
+    /**
+     *
+     * @param {VariableType} type
+     * @param {string} name
+     * @param {*} value
+     */
+    static declare(type, name, value = undefined) {
+        this.checkAlreadyDeclared(name, type);
+        switch (type) {
+            case this.VariableType.Let:
+                this.currentScope.v[name] = { type, value };
+                break;
+            case this.VariableType.Const:
+                this.currentScope.v[name] = { type, value };
+                break;
+            case this.VariableType.Var: {
+                let scope = this.currentScope;
+                while (scope) {
+                    if (scope.type === this.ScopeType.Function || scope.type === this.ScopeType.Global) {
+                        scope.v[name] = { type, value };
+                        scope = undefined;
+                    } else {
+                        scope = scope.parentScope;
+                    }
+                }
+                break;
+            }
+            default:
+                throw new SyntaxError(`Unexpected variable declaration type: ${type}`);
+        }
+    }
+
+    static setValue(name, value) {
+        const reference = this.getReference(name, true);
+        if (!reference) {
+            throw new ReferenceError(`${name} is not defined.`);
+        }
+        if (reference.type === this.VariableType.Const) {
+            throw new TypeError(`Assignment to constant variable: ${name}`);
+        }
+        return (reference.value = value);
+    }
+
+    static getValue(name) {
+        const reference = this.getReference(name);
+        return reference?.value;
+    }
+
+    static getReference(name) {
+        let scope = this.currentScope;
+        while (scope) {
+            if (scope.v.hasOwnProperty(name)) {
+                return scope.v[name];
+            }
+            if (scope.type === this.ScopeType.Global) {
+                scope = undefined;
+            } else {
+                scope = scope.parentScope;
+            }
+        }
+        return undefined;
+    }
+
+    static checkAlreadyDeclared(name, type) {
+        let scope = this.currentScope;
+        while (scope) {
+            if (scope.v.hasOwnProperty(name)) {
+                if (type === this.VariableType.Const || type === this.VariableType.Let
+                    || scope.v[name].type !== this.VariableType.Var) {
+                    throw new SyntaxError(`Identifier '${name}' has already been declared`);
+                }
+            }
+            if (scope.type === this.ScopeType.Function || scope.type === this.ScopeType.Global) {
+                scope = undefined;
+            } else {
+                scope = scope.parentScope;
+            }
+        }
+    }
+}
+
+// eslint-disable-next-line no-unused-vars
 class LabelProcessor {
     static DEFAULT_VARIABLES = {
         Number: window.Number,
@@ -53,21 +181,22 @@ class LabelProcessor {
         }
     };
 
-    static variables;
+    static scopePath = [];
 
     constructor() {
         throw new SyntaxError('LabelProcessor cannot be instantiated. Example: use "LabelProcessor.process(tree, variables);"');
     }
 
     static parseLabelScript(script) {
-        return esprima.parseScript(`function __$lp(){${script}}`);
+        return esprima.parseScript(`function __$lp(){${script}} __$lp()`);
     }
 
     path = [];
     static process(esTree, globalVariables) {
-        this.variables = { ...LabelProcessor.DEFAULT_VARIABLES, ...globalVariables };
+        this.globalVariables = { ...LabelProcessor.DEFAULT_VARIABLES, ...globalVariables };
         this.path = [];
-        return { output: this.processNode(esTree), variables: this.variables };
+        VariableContainer.reset();
+        return { output: this.processNode(esTree), variables: this.globalVariables };
     }
 
     static processNode(node, context) {
@@ -75,7 +204,13 @@ class LabelProcessor {
         let returnValue;
         switch (node.type) {
             case esprima.Syntax.Program:
+                VariableContainer.addScope(VariableContainer.ScopeType.Global);
+                // Add global variables
+                Object.keys(this.globalVariables).forEach(key => {
+                    VariableContainer.declare(VariableContainer.VariableType.Let, key, this.globalVariables[key]);
+                });
                 returnValue = this.processProgram(node);
+                VariableContainer.removeCurrentScope();
                 break;
             case esprima.Syntax.ExpressionStatement:
                 returnValue = this.processNode(node.expression);
@@ -93,7 +228,7 @@ class LabelProcessor {
                 returnValue = this.processVariableDeclaration(node);
                 break;
             case esprima.Syntax.VariableDeclarator:
-                returnValue = this.processVariableDeclarator(node);
+                returnValue = this.processVariableDeclarator(node, context);
                 break;
             case esprima.Syntax.CallExpression:
                 returnValue = this.processCallExpression(node, context);
@@ -108,7 +243,9 @@ class LabelProcessor {
                 returnValue = this.processIfStatement(node);
                 break;
             case esprima.Syntax.BlockStatement:
+                VariableContainer.addScope(VariableContainer.ScopeType.Block);
                 returnValue = this.processBlockStatement(node);
+                VariableContainer.removeCurrentScope();
                 break;
             case esprima.Syntax.EmptyStatement:
                 // do nothing;
@@ -205,7 +342,7 @@ class LabelProcessor {
         let returnValue;
         switch (node.argument.type) {
             case esprima.Syntax.Identifier:
-                returnValue = this.getTopLevelVariable(this.processNode(node.argument));
+                returnValue = VariableContainer.getValue(node.argument.name);
                 break;
             default:
                 returnValue = this.processNode(node.argument);
@@ -223,30 +360,15 @@ class LabelProcessor {
     }
 
     static processFunctionDeclaration(node) {
-        const name = this.processNode(node.id);
-        if (this.variables.hasOwnProperty(name)) {
-            throw new SyntaxError(`Invalid function declaration. Identifier ${name} has already been declared`);
-        }
-        // TODO: Parameters are stored as global variables. This could be improved.
-        node.params.forEach(param => {
-            const paramName = this.processNode(param);
-            if (this.variables.hasOwnProperty(paramName)) {
-                throw new SyntaxError(`Function "${name}" uses parameter name "${paramName}" that's already declared.`);
-            }
-            this.setTopLevelVariable(paramName, undefined);
-        });
-        return (this.variables[name] = (...args) => {
-            args.forEach((arg, i) => {
-                this.setTopLevelVariable(node.params[i].name, args[i]);
-            });
-            const returnValue = this.processNode(node.body);
-            return returnValue;
-        });
+        return VariableContainer.declare(VariableContainer.VariableType.Var, this.processNode(node.id), node);
     }
 
     static processProgram(node) {
-        this.processNode(node.body[0]);
-        return this.variables.__$lp();
+        let returnValue;
+        node.body.forEach(childNode => {
+            returnValue = this.processNode(childNode);
+        });
+        return returnValue;
     }
 
     static processNewExpression(node) {
@@ -286,7 +408,7 @@ class LabelProcessor {
         let returnValue;
         let test;
         if (node.test.type === esprima.Syntax.Identifier) {
-            test = this.getTopLevelVariable(node.test.name);
+            test = VariableContainer.getValue(node.test.name);
         } else {
             test = this.processNode(node.test);
         }
@@ -317,34 +439,17 @@ class LabelProcessor {
             case esprima.Syntax.VariableDeclarator:
             case esprima.Syntax.ObjectExpression:
             case esprima.Syntax.CallExpression:
-                return this.getTopLevelVariable(node.name);
+                return VariableContainer.getValue(node.name);
             default:
                 return node.name;
         }
-    }
-
-    static getTopLevelVariable(variableName) {
-        let returnValue;
-        if (this.variables.hasOwnProperty(variableName)) {
-            returnValue = this.variables[variableName];
-        }
-        // TODO: Find a preprocessor to remove test code like this.
-        if (returnValue === undefined) {
-            console.warn(`Variabe is undefined: ${variableName}`);
-        }
-        return returnValue;
-    }
-
-    static setTopLevelVariable(variableName, value) {
-        this.variables[variableName] = value;
-        return value;
     }
 
     static getMemberExpressionObject(expression) {
         let returnValue;
         switch (expression.object.type) {
             case esprima.Syntax.Identifier: {
-                returnValue = this.getTopLevelVariable(expression.object.name);
+                returnValue = VariableContainer.getValue(expression.object.name);
                 break;
             }
             case esprima.Syntax.CallExpression:
@@ -442,37 +547,50 @@ class LabelProcessor {
         return returnValue;
     }
 
-    static processVariableDeclaration(variableDeclaration) {
-        switch (variableDeclaration.kind) {
+    static processVariableDeclaration(node) {
+        switch (node.kind) {
             // TODO: handle different declaration types
             case 'let':
             case 'const':
             case 'var':
-                variableDeclaration.declarations.forEach(declaration => {
-                    this.processNode(declaration);
+                node.declarations.forEach(declaration => {
+                    this.processNode(declaration, node);
                 });
                 break;
             default:
-                throw new SyntaxError(`Unexpected variable declaration kind: ${variableDeclaration.type}`);
+                throw new SyntaxError(`Unexpected variable declaration kind: ${node.type}`);
         }
     }
 
-    static processVariableDeclarator(node) {
+    static processVariableDeclarator(node, context) {
         const name = this.processNode(node.id);
-        if (this.variables.hasOwnProperty(name)) {
-            throw new SyntaxError(`Invalid function declaration. Identifier ${name} has already been declared.`);
+        const value = node.init ? this.processNode(node.init, node) : undefined;
+        let declarationType;
+        switch (context.kind) {
+            case 'let':
+                declarationType = VariableContainer.VariableType.Let;
+                break;
+            case 'const':
+                declarationType = VariableContainer.VariableType.Const;
+                break;
+            case 'var':
+                declarationType = VariableContainer.VariableType.Var;
+                break;
+            default:
+                throw new TypeError(`Unexpected variable declaration kind: ${context.kind}`);
         }
-        return (this.variables[name] = node.init ? this.processNode(node.init, node) : undefined);
+        VariableContainer.declare(declarationType, name, value);
     }
 
-    static processCallExpression(expression, context) {
-        const { callee } = expression;
+    static processCallExpression(node, context) {
+        const { callee } = node;
+        let returnValue;
         let methodToCall;
         let calleeObject;
         switch (callee.type) {
             case esprima.Syntax.MemberExpression: {
                 if (callee.object.type === esprima.Syntax.Identifier) {
-                    calleeObject = this.getTopLevelVariable(callee.object.name);
+                    calleeObject = this.processNode(callee.object, node);
                 } else {
                     calleeObject = this.processNode(callee.object);
                 }
@@ -486,14 +604,24 @@ class LabelProcessor {
                 break;
             }
             case esprima.Syntax.Identifier:
-                calleeObject = null;
-                methodToCall = this.getTopLevelVariable(callee.name);
+                methodToCall = this.processNode(callee, node);
                 break;
             default:
                 throw new SyntaxError(`Unexpected callee type in call expression: ${callee.type}`);
         }
-        const args = expression.arguments.map(arg => this.processNode(arg, expression));
-        const returnValue = methodToCall.call(calleeObject, ...args);
+        if (methodToCall.type === esprima.Syntax.FunctionDeclaration) {
+            VariableContainer.addScope(VariableContainer.ScopeType.Function);
+            for (let i = 0; i < Math.min(node.arguments.length, methodToCall.params.length); i++) {
+                VariableContainer.declare(VariableContainer.VariableType.Var, methodToCall.params[i], this.processNode(node.arguments[i], node));
+            }
+            returnValue = this.processNode(methodToCall.body);
+            VariableContainer.removeCurrentScope();
+        } else {
+            const args = node.arguments.map(arg => this.processNode(arg, node));
+            returnValue = methodToCall.call(calleeObject, ...args);
+        }
+        // const args = expression.arguments.map(arg => this.processNode(arg, expression));
+        // const returnValue = methodToCall.call(calleeObject, ...args);
         return returnValue;
     }
 
@@ -501,7 +629,7 @@ class LabelProcessor {
         let returnValue;
         switch (left.type) {
             case esprima.Syntax.Identifier:
-                returnValue = this.setTopLevelVariable(left.name, this.processNode(right));
+                returnValue = VariableContainer.setValue(left.name, this.processNode(right));
                 break;
             case esprima.Syntax.MemberExpression: {
                 const object = this.getMemberExpressionObject(left);
@@ -519,8 +647,8 @@ class LabelProcessor {
         let leftValue;
         switch (node.left.type) {
             case esprima.Syntax.Identifier: {
-                leftValue = this.getTopLevelVariable(node.left.name);
-                returnValue = this.setTopLevelVariable(node.left.name, func(leftValue, this.processNode(node.right, node)));
+                leftValue = VariableContainer.getValue(node.left.name);
+                returnValue = VariableContainer.setValue(node.left.name, func(leftValue, this.processNode(node.right, node)));
                 break;
             }
             case esprima.Syntax.MemberExpression: {

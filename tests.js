@@ -1,3 +1,4 @@
+/* eslint-disable object-shorthand */
 /* eslint-disable quotes */
 /* eslint-disable max-len */
 /* eslint-disable camelcase */
@@ -16,11 +17,13 @@
 
 /* global LabelProcessor */
 /* global Test */
+/* global VariableContainer */
 
 (function main() {
     'use strict';
 
     window.LabelProcessor = LabelProcessor;
+    VariableContainer.debug = true;
 
     const moreTests = [
         "return fieldValues.ARPT_NAME + ' ' + '(' + (fieldValues.NOTAM_ID) + ')';",
@@ -164,7 +167,7 @@
         "return label.replace(_regexReplace.r3,'');",
         "label = ''; const cd = new Date(Number(fieldValues.NEWDATE)); label += fieldValues.ROADNAME +' - ' + cd.toLocaleDateString(); return label;",
         "let zoom = W.map.getZoom(); if (zoom >= 2) {  label = fieldValues.NAME; } if (zoom >= 5) {  label += '\\n' + fieldValues.ADDRESS; } return label;",
-        "label = ''; cd = new Date(Number(fieldValues.ENTERED_ON)); label += fieldValues.ROADNAME +' - ' + cd.toLocaleDateString(); return label;",
+        "label = ''; var cd = new Date(Number(fieldValues.ENTERED_ON)); label += fieldValues.ROADNAME +' - ' + cd.toLocaleDateString(); return label;",
         "label = ''; if (fieldValues.State_Rout != '' && fieldValues.State_Rout != ' ' && fieldValues.State_Rout != null)  label += ' ' + fieldValues.State_Rout; if (fieldValues.State_Ro_1 != '' && fieldValues.State_Ro_1 != ' ' && fieldValues.State_Ro_1 != null)  label += ' ' + fieldValues.State_Ro_1; if (fieldValues.State_Ro_2 != '' && fieldValues.State_Ro_2 != ' ' && fieldValues.State_Ro_2 != null)  label += ' ' + fieldValues.State_Ro_2; if (fieldValues.State_Ro_3 != '' && fieldValues.State_Ro_3 != ' ' && fieldValues.State_Ro_3 != null)  label += ' ' + fieldValues.State_Ro_3; if (fieldValues.State_Ro_4 != '' && fieldValues.State_Ro_4 != ' ' && fieldValues.State_Ro_4 != null)  label += ' ' + fieldValues.State_Ro_4; if (fieldValues.State_Ro_5 != '' && fieldValues.State_Ro_5 != ' ' && fieldValues.State_Ro_5 != null)  label += ' ' + fieldValues.State_Ro_5; return label;",
         "return label.replace(/\\sPARISH$/, '');",
         "return fieldValues.NAME + '\\n' + fieldValues.STREET;",
@@ -237,7 +240,7 @@
         "label = ''; var cd = new Date(Number(fieldValues.CREATE_DATE)); label += fieldValues.STREETNAME+ ' - ' + cd.toLocaleDateString(); return label;",
         "label = ''; var cd = new Date(Number(fieldValues.created_date)); label += fieldValues.FULL_ST_NAME+ ' - ' + cd.toLocaleDateString(); return label;",
         "label = ''; var cd = new Date(Number(fieldValues.DATE_OF_EDIT)); label += fieldValues.FULL_NAME+ ' - ' + cd.toLocaleDateString(); return label;",
-        "label = ''; cd = new Date(Number(fieldValues.CREATED)); label += fieldValues.STREET+ ' - ' + cd.toLocaleDateString(); return label;",
+        "label = ''; var cd = new Date(Number(fieldValues.CREATED)); label += fieldValues.STREET+ ' - ' + cd.toLocaleDateString(); return label;",
         "label = ''; var cd = new Date(Number(fieldValues.dateadded)); label += fieldValues.wholestname + ' - ' + cd.toLocaleDateString(); return label;",
         "label = ''; var cd = new Date(Number(fieldValues.CREATION)); label += fieldValues.STREET+ ' - ' + cd.toLocaleDateString(); return label;",
         "label = ''; var cd = new Date(Number(fieldValues.CREATEDATE)); label += fieldValues.LABEL+ ' - ' + cd.toLocaleDateString(); return label;",
@@ -298,11 +301,11 @@
             + "\nelse label = cName ? cName : hName;"
             + "\nif (addr) label += `\\n(${addr})`;"
             + "\nreturn label;",
-        "label = ''; cd = new Date(Number(fieldValues.created_date)); label += fieldValues.FULL_NAME +' - ' + cd.toLocaleDateString(); return label;",
+        "label = ''; var cd = new Date(Number(fieldValues.created_date)); label += fieldValues.FULL_NAME +' - ' + cd.toLocaleDateString(); return label;",
         "return fieldValues.Fromstreet + ' ' + '->' + ' ' + fieldValues.Tostreet + '\\n' + '( Status:' + ' ' + fieldValues.Status + ' )';",
-        "label = ''; cd = new Date(Number(fieldValues.created_date)); label += fieldValues.FULLNAME +' - ' + cd.toLocaleDateString(); return label;",
-        "label = ''; cd = new Date(Number(fieldValues.created_date)); label += fieldValues.LABEL +' - ' + cd.toLocaleDateString(); return label;",
-        "label = ''; cd = new Date(Number(fieldValues.DATE_INSTALLED)); label += fieldValues.FULLNAME +' - ' + cd.toLocaleDateString(); return label;",
+        "label = ''; var cd = new Date(Number(fieldValues.created_date)); label += fieldValues.FULLNAME +' - ' + cd.toLocaleDateString(); return label;",
+        "label = ''; var cd = new Date(Number(fieldValues.created_date)); label += fieldValues.LABEL +' - ' + cd.toLocaleDateString(); return label;",
+        "label = ''; var cd = new Date(Number(fieldValues.DATE_INSTALLED)); label += fieldValues.FULLNAME +' - ' + cd.toLocaleDateString(); return label;",
         "label = ''; label += ((fieldValues['FACLTY_CARRD_BY_STRUC'] != '') ? (`Route: ${fieldValues['FACLTY_CARRD_BY_STRUC']}\\n`): ''); label += ((fieldValues['FEAT_INTSECT'] != '') ? (`Intersection: ${fieldValues['FEAT_INTSECT']}`): ''); return label;",
         "label = ''; label += (Boolean(fieldValues['Street']) ? fieldValues['Street'] : ''); label += (Boolean(fieldValues['Crossing_Number']) ? ' (' + fieldValues['Crossing_Number'] + ')' : ''); return label;",
         "label = fieldValues['SDE.SDE.HCTRA_Facilities.OnlineMapDescription']; if (fieldValues['SDE.SDE.HCTRA_Facilities.Type']) { label += '\\n TYPE: ' + fieldValues['SDE.SDE.HCTRA_Facilities.Type'] }; if (fieldValues['SDE.SDE.HCTRA_Facilities.Tolled']) { label += '\\n TOLL: ' + fieldValues['SDE.SDE.HCTRA_Facilities.Tolled'] }; if (fieldValues['SDE.SDE.HCTRA_Facilities.EZ_Rate']) { label += '\\n EZ-Rate: ' + fieldValues['SDE.SDE.HCTRA_Facilities.EZ_Rate'] }; if (fieldValues['SDE.SDE.HCTRA_Facilities.Cash_Rate']) { label += '\\n Cash-Rate: ' + fieldValues['SDE.SDE.HCTRA_Facilities.Cash_Rate'] }; return label;",
@@ -378,7 +381,7 @@
         "return fieldValues.Full_House_Number.replace(/^\\w{5}/,'') + ' ' + fieldValues.FullStNm;",
         "return fieldValues.SiteAddresses1.replace(/^\\w{5}/,'');",
         "return fieldValues.Full_Address.replace(fieldValues.Site_Num_Prefix, '');",
-        "label = fieldValues.DISPLAYNAME; cd = new Date(Number(fieldValues.RPTTIME)); label += `\\nUPDATED TIME: ${cd.toLocaleString()}\\nPOSTED SPEED: ${fieldValues.POSTEDSPEED} MPH`; label += ((fieldValues.SPEEDREDUCED == 'F')  ? '\\nREDUCED SPEED: NO'  : (fieldValues.SPEEDREDUCED == 'T')  ? '\\nREDUCED SPEED: YES'  : ((fieldValues.SPEEDREDUCED == null) || (fieldValues.SPEEDREDUCED == ''))  ? '\\nREDUCED SPEED: UNKNOWN'  : ''); return label;",
+        "label = fieldValues.DISPLAYNAME; var cd = new Date(Number(fieldValues.RPTTIME)); label += `\\nUPDATED TIME: ${cd.toLocaleString()}\\nPOSTED SPEED: ${fieldValues.POSTEDSPEED} MPH`; label += ((fieldValues.SPEEDREDUCED == 'F')  ? '\\nREDUCED SPEED: NO'  : (fieldValues.SPEEDREDUCED == 'T')  ? '\\nREDUCED SPEED: YES'  : ((fieldValues.SPEEDREDUCED == null) || (fieldValues.SPEEDREDUCED == ''))  ? '\\nREDUCED SPEED: UNKNOWN'  : ''); return label;",
         "return fieldValues.Name + '\\n' + fieldValues.Location;",
         "return fieldValues.TITLE + '\\n' + fieldValues.LOCATION + '\\nSTATUS: ' + fieldValues.STATUS;",
         "return fieldValues.Name + '\\n' + fieldValues.Address + '\\nTYPE: ' + fieldValues.RURALSTATIONTYPE;"
@@ -547,9 +550,16 @@
             expectedVariables: { a: { doesExist: () => 3 } }
         }),
         new Test({
+            id: 'function #1',
+            code: "function test() { return 99; } return test();",
+            variables: { },
+            expectedOutput: 99,
+            expectedVariables: { test: function() { return 1; } }
+        }),
+        new Test({
             id: 'VariableDeclaration (error - reassigned)',
-            code: "var t;",
-            variables: { t: 2 },
+            code: "let t; let t;",
+            variables: { t: undefined },
             expectedOutput: { errorType: SyntaxError, message: 'Invalid function declaration. Identifier t has already been declared.' }
         }),
         new Test({
@@ -622,7 +632,7 @@
             expectedVariables: { d: 'test' }
         }),
         new Test({
-            id: 'real test 1',
+            id: "return 'MM ' + Math.round(label).toString()",
             code: "return 'MM ' + Math.round(label).toString()",
             variables: { label: '32.2' },
             expectedOutput: 'MM 32',
@@ -637,7 +647,7 @@
         }),
         new Test({
             id: 'real test 3',
-            code: "label = ''; cd = new Date(Number(fieldValues.created_date)); label += fieldValues.FULL_NAME +' - ' + cd.toLocaleDateString(); return label;",
+            code: "label = ''; var cd = new Date(Number(fieldValues.created_date)); label += fieldValues.FULL_NAME +' - ' + cd.toLocaleDateString(); return label;",
             variables: {
                 fieldValues: {
                     FULL_NAME: 'TEST RD',
@@ -669,19 +679,19 @@
         })
     ];
 
-    // moreTests.forEach((code, index) => {
-    //     const test = new Test({
-    //         id: 3 + index,
-    //         code,
-    //         variables: { fieldValues: {} },
-    //         expectedOutput: ''
-    //     });
-    //     code.matchAll(/fieldValues\.([a-z0-9_.]+)/ig).forEach(match => ([, test.variables.fieldValues[match[1]]] = match));
-    //     code.matchAll(/fieldValues\[['"]([a-z0-9_.]+)['"]\]/ig).forEach(match => ([, test.variables.fieldValues[match[1]]] = match));
-    //     tests.push(test);
-    // });
+    moreTests.forEach((code, index) => {
+        const test = new Test({
+            id: 3 + index,
+            code,
+            variables: { fieldValues: {} },
+            expectedOutput: ''
+        });
+        code.matchAll(/fieldValues\.([a-z0-9_.]+)/ig).forEach(match => ([, test.variables.fieldValues[match[1]]] = match));
+        code.matchAll(/fieldValues\[['"]([a-z0-9_.]+)['"]\]/ig).forEach(match => ([, test.variables.fieldValues[match[1]]] = match));
+        tests.push(test);
+    });
 
-    const ONLY_RUN_TEST_ID = '';
+    const ONLY_RUN_TEST_ID = "";
     const SHOW_ALL_RESULTS = false;
     const yellowBackground = 'background-color: yellow';
     const boldFont = 'font-weight: bold';
@@ -717,6 +727,7 @@
             testResult.variables = testResultVariables;
 
             const validationResult = test.validate(testResult);
+            testResult.variables = VariableContainer.scopeHistory;
             if (SHOW_ALL_RESULTS || !validationResult.outputValidated || !validationResult.variablesValidated || ONLY_RUN_TEST_ID) {
                 console.log(`TEST ID:    %c${test.id}`, boldFont);
                 console.log('%cOUTPUT:    ', validationResult.outputValidated ? normal : yellowBackground, testResult.output); // .replace('\n', '\\n'));
