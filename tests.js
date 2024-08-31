@@ -11,19 +11,20 @@
 // @match        https://www.google.com*
 // @grant        none
 // @require      https://cdn.jsdelivr.net/npm/esprima-next@6/dist/esprima.min.js
-// @require      https://github.com/mapomatic/Parsing-Test/raw/main/LabelProcessor.js
+// @require      https://github.com/mapomatic/Parsing-Test/raw/main/ESTreeProcessor.js
 // @require      https://github.com/mapomatic/Parsing-Test/raw/main/Test.js
 // ==/UserScript==
 
-/* global LabelProcessor */
+/* global ESTreeProcessor */
 /* global Test */
-/* global VariableContainer */
+/* global esprima */
 
 (function main() {
     'use strict';
 
-    window.LabelProcessor = LabelProcessor;
-    VariableContainer.debug = true;
+    window.ESTreeProcessor = ESTreeProcessor;
+    window.esprima = esprima;
+    ESTreeProcessor.debug = true;
 
     const moreTests = [
         "return fieldValues.ARPT_NAME + ' ' + '(' + (fieldValues.NOTAM_ID) + ')';",
@@ -569,6 +570,12 @@
             expectedOutput: { errorType: SyntaxError, message: "Identifier 't' has already been declared" }
         }),
         new Test({
+            id: 'array predicate function',
+            code: "function test(v) { return v > 2; } var a = [1,2,3]; return a.some(test);",
+            variables: { t: undefined },
+            expectedOutput: true
+        }),
+        new Test({
             id: 'AssignmentExpression (assign literal to variable)',
             code: "t = 3;",
             variables: { t: undefined },
@@ -715,25 +722,25 @@
             testIds.push(test.id);
             if (ONLY_RUN_TEST_ID && test.id !== ONLY_RUN_TEST_ID) return;
             testCount++;
-            tree = LabelProcessor.parseLabelScript(test.code);
+            tree = parseProcessLabelFunction(test.code);
 
             let testResult;
             try {
-                testResult = LabelProcessor.process(tree, test.variables);
+                testResult = ESTreeProcessor.process(tree, test.variables);
             } catch (ex) {
                 testResult = { output: ex, variables: test.variables };
             }
 
             // Filter out the default variables first
-            const testResultVariables = {};
-            Object.keys(testResult.variables)
-                .filter(key => !LabelProcessor.DEFAULT_VARIABLES.hasOwnProperty(key) && !Test.DEFAULT_VARIABLES.hasOwnProperty(key))
-                .forEach(key => (testResultVariables[key] = testResult.variables[key]));
-            delete testResultVariables.__$lp; // remove the program function variable
-            testResult.variables = testResultVariables;
+            // const testResultVariables = {};
+            // Object.keys(testResult.variables)
+            //     .filter(key => !ESTreeProcessor.#DEFAULT_VARIABLES.hasOwnProperty(key) && !Test.DEFAULT_VARIABLES.hasOwnProperty(key))
+            //     .forEach(key => (testResultVariables[key] = testResult.variables[key]));
+            // delete testResultVariables.__$lp; // remove the program function variable
+            // testResult.variables = testResultVariables;
 
             const validationResult = test.validate(testResult);
-            testResult.variables = VariableContainer.scopeHistory;
+            testResult.variables = ESTreeProcessor.variableHistory;
             if (SHOW_ALL_RESULTS || !validationResult.outputValidated || !validationResult.variablesValidated || ONLY_RUN_TEST_ID) {
                 console.log(`TEST ID:    %c${test.id}`, boldFont);
                 console.log('%cOUTPUT:    ', validationResult.outputValidated ? normal : yellowBackground, testResult.output); // .replace('\n', '\\n'));
@@ -762,5 +769,9 @@
         //     // skip it
         // }
     });
+
+    function parseProcessLabelFunction(script) {
+        return esprima.parseScript(`function __$lp(){${script}} __$lp()`);
+    }
     console.log(`TESTS COMPLETED: ${testCount}`);
 })();

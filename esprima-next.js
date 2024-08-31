@@ -26,7 +26,9 @@ This is a copy of the esprima-next library. The jsNode build has been modified t
 /* eslint-disable no-return-assign */
 /* eslint-disable max-len */
 /* eslint-disable max-classes-per-file */
-(function main() {
+
+// eslint-disable-next-line func-names
+const esprima = (function() {
     'use strict';
 
     const Syntax = {
@@ -5249,7 +5251,7 @@ This is a copy of the esprima-next library. The jsNode build has been modified t
     }
     const version = '6.0.3';
     // eslint-disable-next-line camelcase
-    window.esprima = {
+    return {
         parse,
         parseModule,
         parseScript,
