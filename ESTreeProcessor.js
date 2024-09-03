@@ -1,3 +1,4 @@
+/* eslint-disable no-bitwise */
 // name         ESTreeProcessor
 // namespace    https://github.com/mapomatic
 // version      1.0.0
@@ -11,11 +12,9 @@
  * The older esprima library might also work but it lacks some functions.
 */
 
-// TODO: Missing syntax:
-//  ArrowFunctionExpression
-
 // TODO: Not working:
-// - A lot of stuff that I may never get around to...
+// - Classes
+// - Probably a lot more I haven't discovered yet.
 
 /* eslint-disable eqeqeq */
 /* eslint-disable max-classes-per-file */
@@ -27,76 +26,48 @@
 const ESTreeProcessor = (function() {
     'use strict';
 
-    // eslint-disable-next-line no-shadow
-    class ScopeContainer {
-        static currentScope;
-        static scopeHistory = [];
-        static debug = false;
+    const ScopeType = {
+        Global: 'Global',
+        Function: 'Function',
+        Block: 'Block'
+    };
 
-        static ScopeType = {
-            Global: 'Global',
-            Function: 'Function',
-            Block: 'Block'
-        };
+    const VariableType = {
+        Let: 'Let',
+        Const: 'Const',
+        Var: 'Var'
+    };
 
-        static VariableType = {
-            Let: 'Let',
-            Const: 'Const',
-            Var: 'Var'
-        };
+    class Scope {
+        /** @type {Scope} */
+        parent;
+        variables = {};
+        /** @type {string} */
+        type;
 
-        constructor() {
-            throw new SyntaxError('Cannot call new on the Scope class.');
+        constructor(type, parent) {
+            this.type = type;
+            this.parent = parent;
+            this.variables = {};
         }
 
-        static reset() {
-            this.scopeHistory = [];
-            this.currentScope = undefined;
-        }
-
-        /**
-         *
-         * @param {ScopeType} type
-         */
-        static addScope(type) {
-            const scope = {
-                parentScope: this.currentScope,
-                v: {},
-                type
-            };
-            this.currentScope = scope;
-        }
-
-        static removeCurrentScope() {
-            if (this.debug) {
-                this.scopeHistory.push(this.currentScope);
-            }
-            this.currentScope = this.currentScope.parentScope;
-        }
-
-        /**
-         *
-         * @param {VariableType} type
-         * @param {string} name
-         * @param {*} value
-         */
-        static declare(type, name, value = undefined) {
+        declare(type, name, value = undefined) {
             this.checkAlreadyDeclared(name, type);
             switch (type) {
-                case this.VariableType.Let:
-                    this.currentScope.v[name] = { type, value };
+                case VariableType.Let:
+                    this.variables[name] = { type, value };
                     break;
-                case this.VariableType.Const:
-                    this.currentScope.v[name] = { type, value };
+                case VariableType.Const:
+                    this.variables[name] = { type, value };
                     break;
-                case this.VariableType.Var: {
-                    let scope = this.currentScope;
+                case VariableType.Var: {
+                    let scope = this;
                     while (scope) {
-                        if (scope.type === this.ScopeType.Function || scope.type === this.ScopeType.Global) {
-                            scope.v[name] = { type, value };
+                        if (scope.type === ScopeType.Function || scope.type === ScopeType.Global) {
+                            scope.variables[name] = { type, value };
                             scope = undefined;
                         } else {
-                            scope = scope.parentScope;
+                            scope = scope.parent;
                         }
                     }
                     break;
@@ -106,148 +77,179 @@ const ESTreeProcessor = (function() {
             }
         }
 
-        static setValue(name, value) {
+        checkAlreadyDeclared(name, type) {
+            let scope = this;
+            while (scope) {
+                if (scope.variables.hasOwnProperty(name)) {
+                    if (type === VariableType.Const || type === VariableType.Let
+                        || scope.variables[name].type !== VariableType.Var) {
+                        throw new SyntaxError(`Identifier '${name}' has already been declared`);
+                    }
+                }
+                if (scope.type === ScopeType.Function || scope.type === ScopeType.Global) {
+                    scope = undefined;
+                } else {
+                    scope = scope.parent;
+                }
+            }
+        }
+
+        setValue(name, value) {
             const reference = this.getReference(name, true);
             if (!reference) {
                 throw new ReferenceError(`${name} is not defined.`);
             }
-            if (reference.type === this.VariableType.Const) {
+            if (reference.type === VariableType.Const) {
                 throw new TypeError(`Assignment to constant variable: ${name}`);
             }
             return (reference.value = value);
         }
 
-        static getValue(name) {
+        getValue(name) {
             const reference = this.getReference(name);
             return reference?.value;
         }
 
-        static getReference(name) {
-            let scope = this.currentScope;
+        getReference(name) {
+            let scope = this;
             while (scope) {
-                if (scope.v.hasOwnProperty(name)) {
-                    return scope.v[name];
+                if (scope.variables.hasOwnProperty(name)) {
+                    return scope.variables[name];
                 }
-                if (scope.type === this.ScopeType.Global) {
+                if (scope.type === ScopeType.Global) {
                     scope = undefined;
                 } else {
-                    scope = scope.parentScope;
+                    scope = scope.parent;
                 }
             }
             return undefined;
         }
 
-        static checkAlreadyDeclared(name, type) {
-            let scope = this.currentScope;
-            while (scope) {
-                if (scope.v.hasOwnProperty(name)) {
-                    if (type === this.VariableType.Const || type === this.VariableType.Let
-                        || scope.v[name].type !== this.VariableType.Var) {
-                        throw new SyntaxError(`Identifier '${name}' has already been declared`);
-                    }
-                }
-                if (scope.type === this.ScopeType.Function || scope.type === this.ScopeType.Global) {
-                    scope = undefined;
-                } else {
-                    scope = scope.parentScope;
-                }
-            }
+        createChildScope(type) {
+            return new Scope(type, this);
         }
     }
 
+    class FlowStopper {}
+    class Break extends FlowStopper {}
+    class Continue extends FlowStopper {}
+    class Return extends FlowStopper {
+        value;
+        constructor(value) {
+            super();
+            this.value = value;
+        }
+    }
+    class Debugger {}
+    class ChainIsNullish {}
+
     // eslint-disable-next-line no-shadow
     class ESTreeProcessor {
-        static get debug() { return ScopeContainer.debug; }
-        static set debug(value) { ScopeContainer.debug = value; }
-        static get variableHistory() { return ScopeContainer.scopeHistory; }
-
-        constructor() {
-            throw new SyntaxError('ESTreeProcessor cannot be instantiated. Example: use "ESTreeProcessor.process(tree, globalVariables);"');
-        }
-
-        static process(esTree, globalVariables) {
+        process(esTree, globalVariables) {
             this.globalVariables = { ...globalVariables };
-            ScopeContainer.reset();
-            return { output: this.processNode(esTree), variables: this.globalVariables };
+            return { output: this.processNode(esTree, new Scope(ScopeType.Global)), variables: this.globalVariables };
         }
 
-        static processNode(node, context) {
+        processNode(node, scope) {
+            // if (!scope) debugger;
+            // if (!node) debugger;
             let returnValue;
             switch (node.type) {
                 case esprima.Syntax.Program:
-                    returnValue = this.processProgram(node);
+                    returnValue = this.processProgram(node, scope);
                     break;
                 case esprima.Syntax.ExpressionStatement:
-                    returnValue = this.processNode(node.expression);
+                    returnValue = this.processNode(node.expression, scope);
                     break;
                 case esprima.Syntax.Literal:
-                    returnValue = this.processLiteral(node);
+                    returnValue = ESTreeProcessor.processLiteral(node, scope);
                     break;
                 case esprima.Syntax.MemberExpression:
-                    returnValue = this.processMemberExpression(node, context);
+                    returnValue = this.processMemberExpression(node, scope);
                     break;
                 case esprima.Syntax.BinaryExpression:
-                    returnValue = this.processBinaryExpression(node);
+                    returnValue = this.processBinaryExpression(node, scope);
                     break;
                 case esprima.Syntax.VariableDeclaration:
-                    returnValue = this.processVariableDeclaration(node);
+                    returnValue = this.processVariableDeclaration(node, scope);
                     break;
                 case esprima.Syntax.VariableDeclarator:
-                    returnValue = this.processVariableDeclarator(node, context);
+                    returnValue = this.processVariableDeclarator(node, scope);
                     break;
                 case esprima.Syntax.CallExpression:
-                    returnValue = this.processCallExpression(node, context);
+                    returnValue = this.processCallExpression(node, scope);
                     break;
                 case esprima.Syntax.AssignmentExpression:
-                    returnValue = this.processAssigmentExpression(node);
+                    returnValue = this.processAssigmentExpression(node, scope);
                     break;
                 case esprima.Syntax.Identifier:
-                    returnValue = this.processIdentifier(node, context);
+                    returnValue = ESTreeProcessor.processIdentifier(node, scope);
                     break;
                 case esprima.Syntax.IfStatement:
-                    returnValue = this.processIfStatement(node);
+                    returnValue = this.processIfStatement(node, scope);
                     break;
                 case esprima.Syntax.BlockStatement:
-                    returnValue = this.processBlockStatement(node, context);
+                    returnValue = this.processBlockStatement(node, scope);
                     break;
                 case esprima.Syntax.EmptyStatement:
                     // do nothing;
                     break;
                 case esprima.Syntax.TemplateLiteral:
-                    returnValue = this.processTemplateLiteral(node);
+                    returnValue = this.processTemplateLiteral(node, scope);
                     break;
                 case esprima.Syntax.NewExpression:
-                    returnValue = this.processNewExpression(node);
+                    returnValue = this.processNewExpression(node, scope);
                     break;
                 case esprima.Syntax.FunctionDeclaration:
-                    returnValue = this.processFunctionDeclaration(node);
+                    returnValue = this.processFunctionDeclaration(node, scope);
                     break;
                 case esprima.Syntax.ReturnStatement:
-                    returnValue = this.processReturnStatement(node);
+                    returnValue = this.processReturnStatement(node, scope);
                     break;
                 case esprima.Syntax.LogicalExpression:
-                    returnValue = this.processLogicalExpression(node);
+                    returnValue = this.processLogicalExpression(node, scope);
                     break;
                 case esprima.Syntax.UnaryExpression:
-                    returnValue = this.processUnaryExpression(node);
+                    returnValue = this.processUnaryExpression(node, scope);
                     break;
                 case esprima.Syntax.ArrayExpression:
-                    returnValue = this.processArrayExpression(node);
+                    returnValue = this.processArrayExpression(node, scope);
                     break;
                 case esprima.Syntax.ConditionalExpression:
-                    returnValue = this.processConditionalExpression(node);
+                    returnValue = this.processConditionalExpression(node, scope);
                     break;
                 case esprima.Syntax.ObjectExpression:
-                    returnValue = this.processObjectExpression(node);
+                    returnValue = this.processObjectExpression(node, scope);
                     break;
                 case esprima.Syntax.FunctionExpression:
-                    returnValue = this.processFunctionExpression;
+                    returnValue = this.processFunctionExpression(node, scope);
                     break;
                 case esprima.Syntax.ArrowFunctionExpression:
-                    returnValue = this.processArrowFunctionExpression(node);
+                    returnValue = this.processArrowFunctionExpression(node, scope);
                     break;
                 case esprima.Syntax.ChainExpression:
-                    returnValue = this.processChainExpression(node);
+                    returnValue = this.processChainExpression(node, scope);
+                    break;
+                case esprima.Syntax.UpdateExpression:
+                    returnValue = this.processUpdateExpression(node, scope);
+                    break;
+                case esprima.Syntax.ForStatement:
+                    returnValue = this.processForStatement(node, scope);
+                    break;
+                case esprima.Syntax.TryStatement:
+                    returnValue = this.processTryStatement(node, scope);
+                    break;
+                case esprima.Syntax.BreakStatement:
+                    returnValue = ESTreeProcessor.processBreakStatement();
+                    break;
+                case esprima.Syntax.ContinueStatement:
+                    returnValue = ESTreeProcessor.processContinueStatement();
+                    break;
+                case esprima.Syntax.DebuggerStatement:
+                    returnValue = ESTreeProcessor.processDebuggerStatement();
+                    break;
+                case esprima.Syntax.SwitchStatement:
+                    returnValue = this.processSwitchStatement(node, scope);
                     break;
                 default:
                     throw new SyntaxError(`Unexpected node type: ${node.type}`);
@@ -255,29 +257,145 @@ const ESTreeProcessor = (function() {
             return returnValue;
         }
 
-        static processObjectExpression(node) {
+        processSwitchStatement(node, scope) {
+            const discriminant = this.processNode(node.discriminant, scope);
+            let matchIndex = -1;
+            let defaultIndex = -1;
+            for (let i = 0; i < node.cases.length && matchIndex === -1; i++) {
+                const switchCase = node.cases[i];
+                if (!switchCase.test) {
+                    defaultIndex = i;
+                } else if (this.processNode(switchCase.test, scope) === discriminant) {
+                    matchIndex = i;
+                }
+            }
+            if (matchIndex === -1) matchIndex = defaultIndex;
+
+            let returnValue;
+            if (matchIndex > -1) {
+                const switchScope = scope.createChildScope(ScopeType.Block);
+                for (let i = matchIndex; i < node.cases.length && !(returnValue instanceof FlowStopper); i++) {
+                    let result;
+                    const switchCase = node.cases[i];
+                    for (let j = 0; j < switchCase.consequent.length && !(result instanceof FlowStopper); j++) {
+                        result = this.processNode(switchCase.consequent[j], switchScope);
+                        if (!(result instanceof Break || result instanceof Continue)) {
+                            returnValue = result;
+                        }
+                    }
+                }
+            }
+            return returnValue;
+        }
+
+        static processDebuggerStatement() {
+            // eslint-disable-next-line no-debugger
+            debugger;
+            return new Debugger();
+        }
+
+        processTryStatement(node, scope) {
+            let returnValue;
+            try {
+                returnValue = this.processNode(node.block, scope);
+            } catch (e) {
+                // Based on research, I think a Function scope is appropriate here but not certain.
+                const catchScope = scope.createChildScope(ScopeType.Function);
+                node.handler.param.returnName = true;
+                catchScope.declare(VariableType.Var, this.processNode(node.handler.param, catchScope), e);
+                this.processNode(node.handler.body, catchScope);
+            } finally {
+                if (node.finalizer) {
+                    this.processNode(node.finalizer, scope);
+                }
+            }
+            return returnValue;
+        }
+
+        processObjectExpression(node, scope) {
             const returnValue = {};
             node.properties.forEach(property => {
-                returnValue[property.key.name] = this.processNode(property.value, node);
+                property.key.returnName = !node.computed;
+                const key = this.processNode(property.key, scope);
+                returnValue[key] = this.processNode(property.value, scope);
             });
             return returnValue;
         }
 
-        static processConditionalExpression(node) {
-            const returnValue = this.processNode(node.test) ? this.processNode(node.consequent) : this.processNode(node.alternate);
+        processConditionalExpression(node, scope) {
+            const returnValue = this.processNode(node.test, scope) ? this.processNode(node.consequent, scope) : this.processNode(node.alternate, scope);
             return returnValue;
         }
 
-        static processArrayExpression(node) {
-            const returnValue = node.elements.map(element => this.processNode(element));
+        processArrayExpression(node, scope) {
+            const returnValue = node.elements.map(element => this.processNode(element, scope));
             return returnValue;
         }
 
-        static processUnaryExpression(node) {
+        setScopeValue(targetNode, value, scope) {
+            switch (targetNode.type) {
+                case esprima.Syntax.MemberExpression: {
+                    const object = this.processNode(targetNode.object, scope);
+                    targetNode.property.returnName = true;
+                    const propertyName = this.processNode(targetNode.property, scope);
+                    object[propertyName] = value;
+                    break;
+                }
+                case esprima.Syntax.Identifier:
+                    scope.setValue(targetNode.name, value);
+                    break;
+                default:
+                    throw new SyntaxError(`Unexpected target node type in setValue(): ${targetNode.type}`);
+            }
+            return value;
+        }
+
+        processUpdateExpression(node, scope) {
+            const oldValue = this.processNode(node.argument, scope);
+            let newValue;
+            switch (node.operator) {
+                case '++':
+                    newValue = this.setScopeValue(node.argument, oldValue + 1, scope);
+                    break;
+                case '--':
+                    newValue = this.setScopeValue(node.argument, oldValue - 1, scope);
+                    break;
+                default:
+                    throw new SyntaxError(`Unexpected update expression operator: ${node.operator}`);
+            }
+            return node.prefix ? newValue : oldValue;
+        }
+
+        processForStatement(node, scope) {
+            let returnValue;
+            this.processNode(node.init, scope);
+            while (this.processNode(node.test, scope)) {
+                returnValue = this.processNode(node.body, scope);
+                if (returnValue instanceof FlowStopper) {
+                    if (returnValue instanceof Return) {
+                        returnValue = returnValue.value;
+                    }
+                    break;
+                }
+                this.processNode(node.update, scope);
+            }
+            return returnValue;
+        }
+
+        processUnaryExpression(node, scope) {
             let returnValue;
             switch (node.operator) {
                 case '!':
-                    returnValue = !this.processNode(node.argument, node);
+                    returnValue = !this.processNode(node.argument, scope);
+                    break;
+                case '~':
+                    returnValue = ~this.processNode(node.argument, scope);
+                    break;
+                case '-':
+                    returnValue = -this.processNode(node.argument, scope);
+                    break;
+                case 'typeof':
+                    returnValue = typeof this.processNode(node.argument, scope);
                     break;
                 default:
                     throw new SyntaxError(`Unexpected unary expression operator: ${node.operator}`);
@@ -285,17 +403,17 @@ const ESTreeProcessor = (function() {
             return returnValue;
         }
 
-        static processLogicalExpression(node) {
+        processLogicalExpression(node, scope) {
             let returnValue;
             switch (node.operator) {
                 case '&&':
-                    returnValue = this.processNode(node.left, node) && this.processNode(node.right, node);
+                    returnValue = this.processNode(node.left, scope) && this.processNode(node.right, scope);
                     break;
                 case '||':
-                    returnValue = this.processNode(node.left, node) || this.processNode(node.right, node);
+                    returnValue = this.processNode(node.left, scope) || this.processNode(node.right, scope);
                     break;
                 case '??':
-                    returnValue = this.processNode(node.left, node) ?? this.processNode(node.right, node);
+                    returnValue = this.processNode(node.left, scope) ?? this.processNode(node.right, scope);
                     break;
                 default:
                     throw new SyntaxError(`Unexpected logical expression operator: ${node.operator}`);
@@ -303,147 +421,230 @@ const ESTreeProcessor = (function() {
             return returnValue;
         }
 
-        static processReturnStatement(node) {
+        processReturnStatement(node, scope) {
+            const returnValue = this.processNode(node.argument, scope);
+            return new Return(returnValue);
+        }
+
+        static processContinueStatement() {
+            return new Continue();
+        }
+
+        static processBreakStatement() {
+            return new Break();
+        }
+
+        /**
+         *
+         * @param {*} node
+         * @param {Scope} scope
+         * @returns
+         */
+        processArrowFunctionExpression(node, scope) {
+            const func = (...args) => {
+                const esTreeArgs = args.map(arg => {
+                    const argNode = {
+                        type: esprima.Syntax.Literal,
+                        value: arg
+                    };
+                    return argNode;
+                });
+
+                const funcScope = scope.createChildScope(ScopeType.Function);
+                for (let i = 0; i < Math.min(esTreeArgs.length, node.params.length); i++) {
+                    const param = node.params[i];
+                    param.returnName = true;
+                    funcScope.declare(
+                        VariableType.Var,
+                        this.processNode(param, funcScope),
+                        this.processNode(esTreeArgs[i], funcScope)
+                    );
+                }
+                let returnValue = this.processNode(node.body, funcScope);
+                if (returnValue instanceof Return) {
+                    returnValue = returnValue.value;
+                }
+                return returnValue;
+            };
+            return func;
+        }
+
+        processChainExpression(node, scope) {
             let returnValue;
-            switch (node.argument.type) {
-                case esprima.Syntax.Identifier:
-                    returnValue = ScopeContainer.getValue(node.argument.name);
+            switch (node.expression.type) {
+                case esprima.Syntax.CallExpression:
+                case esprima.Syntax.MemberExpression: {
+                    returnValue = this.processNode(node.expression, scope);
                     break;
+                }
                 default:
-                    returnValue = this.processNode(node.argument);
+                    throw new SyntaxError(`Unexpected chain expression type: ${node.expression.type}`);
             }
-            node.returnCalled = true;
+            if (returnValue instanceof ChainIsNullish) returnValue = undefined;
             return returnValue;
         }
 
-        static processArrowFunctionExpression() {
-            throw new SyntaxError('Arrow functions are not supported yet.');
+        processFunctionDeclaration(node, scope) {
+            const func = (...args) => {
+                const esTreeArgs = args.map(arg => {
+                    const argNode = {
+                        type: esprima.Syntax.Literal,
+                        value: arg
+                    };
+                    return argNode;
+                });
+
+                const funcScope = scope.createChildScope(ScopeType.Function);
+                for (let i = 0; i < Math.min(esTreeArgs.length, node.params.length); i++) {
+                    const param = node.params[i];
+                    param.returnName = true;
+                    funcScope.declare(
+                        VariableType.Var,
+                        this.processNode(param, funcScope),
+                        this.processNode(esTreeArgs[i], funcScope)
+                    );
+                }
+                let returnValue = this.processNode(node.body, funcScope);
+                if (returnValue instanceof Return) {
+                    returnValue = returnValue.value;
+                }
+                return returnValue;
+            };
+            if (node.id) {
+                node.id.returnName = true;
+                const funcName = this.processNode(node.id, scope);
+                scope.declare(VariableType.Var, funcName, func);
+            }
+            return func;
         }
 
-        static processChainExpression(node) {
-            return this.processNode(node.expression, node);
+        processFunctionExpression(node, scope) {
+            const func = (...args) => {
+                const esTreeArgs = args.map(arg => {
+                    const argNode = {
+                        type: esprima.Syntax.Literal,
+                        value: arg
+                    };
+                    return argNode;
+                });
+
+                const funcScope = scope.createChildScope(ScopeType.Function);
+                for (let i = 0; i < Math.min(esTreeArgs.length, node.params.length); i++) {
+                    const param = node.params[i];
+                    param.returnName = true;
+                    funcScope.declare(
+                        VariableType.Var,
+                        this.processNode(param, funcScope),
+                        this.processNode(esTreeArgs[i], funcScope)
+                    );
+                }
+                let returnValue = this.processNode(node.body, funcScope);
+                if (returnValue instanceof Return) {
+                    returnValue = returnValue.value;
+                }
+                return returnValue;
+            };
+            return func;
         }
 
-        static processFunctionDeclaration(node) {
-            return ScopeContainer.declare(ScopeContainer.VariableType.Var, this.processNode(node.id), node);
-        }
-
-        static processFunctionExpression(node) {
-            return ScopeContainer.declare(ScopeContainer.VariableType.Var, this.processNode(node.id), node);
-        }
-
-        static processProgram(node) {
+        processProgram(node, scope) {
             let returnValue;
-            ScopeContainer.addScope(ScopeContainer.ScopeType.Global);
             // Add global variables
             Object.keys(this.globalVariables).forEach(key => {
-                ScopeContainer.declare(ScopeContainer.VariableType.Let, key, this.globalVariables[key]);
+                scope.declare(VariableType.Let, key, this.globalVariables[key]);
             });
             node.body.forEach(childNode => {
-                returnValue = this.processNode(childNode, node);
+                returnValue = this.processNode(childNode, scope);
             });
-            ScopeContainer.removeCurrentScope();
+            // this._scopeContainer.removeCurrentScope();
             return returnValue;
         }
 
-        static processNewExpression(node) {
-            const args = node.arguments.map(argument => this.processNode(argument));
-            return Reflect.construct(window[this.processNode(node.callee)], args);
+        processNewExpression(node, scope) {
+            const args = node.arguments.map(argument => this.processNode(argument, scope));
+            return Reflect.construct(this.processNode(node.callee, scope), args);
         }
 
-        static processTemplateLiteral(node) {
-            const values = node.expressions.map(expression => this.processNode(expression));
-            let nextValueIndex = 0;
+        processTemplateLiteral(node, scope) {
             let returnValue = '';
-            node.quasis.forEach(quasi => {
-                if (!quasi.value.raw.length) {
-                    returnValue += values[nextValueIndex];
-                    nextValueIndex++;
-                } else {
-                    returnValue += quasi.value.cooked;
+            for (let i = 0; i < node.quasis.length; i++) {
+                returnValue += node.quasis[i].value.cooked;
+                if (!node.quasis[i].tail) {
+                    returnValue += this.processNode(node.expressions[i], scope);
                 }
-            });
+            }
             return returnValue;
         }
 
-        static processBlockStatement(node, context) {
+        processBlockStatement(node, scope) {
             let returnValue;
-            switch (context.type) {
-                case esprima.Syntax.FunctionDeclaration:
-                    break;
-                default:
-                    ScopeContainer.addScope(ScopeContainer.ScopeType.Block);
-            }
+            // TODO: I don't think we need to ignore the block scope in a function declaration. Test it.
+            // switch (context.type) {
+            //     case esprima.Syntax.FunctionDeclaration:
+            //         break;
+            //     default:
+            const blockScope = scope.createChildScope(ScopeType.Block);
+            // }
 
             for (let i = 0; i < node.body.length; i++) {
                 const childNode = node.body[i];
-                returnValue = this.processNode(childNode);
-                if (childNode.returnCalled) {
-                    node.returnCalled = true;
+                const result = this.processNode(childNode, blockScope);
+                if (result instanceof FlowStopper) {
+                    if (result instanceof Return) {
+                        returnValue = result;
+                    }
                     break;
+                } else if (result instanceof Debugger) {
+                    // do nothing
+                } else {
+                    returnValue = result;
                 }
             }
 
-            switch (context.type) {
-                case esprima.Syntax.FunctionDeclaration:
-                    break;
-                default:
-                    ScopeContainer.removeCurrentScope();
-            }
             return returnValue;
         }
 
-        static processIfStatement(node) {
+        processIfStatement(node, scope) {
             let returnValue;
-            let test;
-            if (node.test.type === esprima.Syntax.Identifier) {
-                test = ScopeContainer.getValue(node.test.name);
-            } else {
-                test = this.processNode(node.test);
-            }
+            const test = this.processNode(node.test, scope);
             if (test) {
-                returnValue = this.processNode(node.consequent, node);
-                if (node.consequent.returnCalled) {
-                    node.returnCalled = true;
-                }
+                returnValue = this.processNode(node.consequent, scope);
+            } else if (node.alternate) {
+                returnValue = this.processNode(node.alternate, scope);
             }
             return returnValue;
-        }
-
-        static isNumeric(str) {
-            if (typeof str !== 'string') return false; // we only process strings!
-            return !isNaN(str) // use type coercion to parse the _entirety_ of the string (`parseFloat` alone does not do this)...
-                && !isNaN(parseFloat(str)); // ...and ensure strings of whitespace fail
         }
 
         static processLiteral(node) {
             return node.value;
         }
 
-        static processIdentifier(node, context) {
-            switch (context?.type) {
-                case esprima.Syntax.AssignmentExpression:
-                case esprima.Syntax.BinaryExpression:
-                case esprima.Syntax.LogicalExpression:
-                case esprima.Syntax.VariableDeclarator:
-                case esprima.Syntax.ObjectExpression:
-                case esprima.Syntax.CallExpression:
-                    return ScopeContainer.getValue(node.name);
-                default:
-                    return node.name;
+        static processIdentifier(node, scope) {
+            let returnValue;
+            if (node.returnName) {
+                returnValue = node.name;
+            } else {
+                returnValue = scope.getValue(node.name);
             }
+            return returnValue;
         }
 
-        static getMemberExpressionObject(expression) {
+        /**
+         *
+         * @param {*} expression
+         * @param {Scope} scope
+         * @returns
+         */
+        getMemberExpressionObject(expression, scope) {
             let returnValue;
             switch (expression.object.type) {
                 case esprima.Syntax.Identifier: {
-                    returnValue = ScopeContainer.getValue(expression.object.name);
+                    returnValue = scope.getValue(expression.object.name);
                     break;
                 }
                 case esprima.Syntax.CallExpression:
                 case esprima.Syntax.MemberExpression: {
-                    const object = this.processNode(expression.object);
+                    const object = this.processNode(expression.object, scope);
                     returnValue = object;
                     break;
                 }
@@ -453,18 +654,25 @@ const ESTreeProcessor = (function() {
             return returnValue;
         }
 
-        static processMemberExpression(expression) {
-            const object = this.getMemberExpressionObject(expression);
+        processMemberExpression(node, scope) {
+            let returnValue;
+            const object = this.getMemberExpressionObject(node, scope);
 
-            const propertyName = this.processNode(expression.property);
-            if (!object.hasOwnProperty(propertyName)) {
-                console.warn(`Object does not contain this property: ${propertyName}`);
+            if (object == null && node.optional) {
+                returnValue = new ChainIsNullish();
+            } else if (object != null || (object == null && !node.optional)) {
+                node.property.returnName = !node.computed;
+                const propertyName = this.processNode(node.property, scope);
+                // if (object[propertyName] == null) {
+                //     console.warn(`Object does not contain this property: ${propertyName}`);
+                // }
+                returnValue = object[propertyName];
             }
-            return object[propertyName];
+            return returnValue;
         }
 
-        static doBinaryExpression(node, func) {
-            return func(this.processNode(node.left, node), this.processNode(node.right, node));
+        doBinaryExpression(node, func, scope) {
+            return func(this.processNode(node.left, scope), this.processNode(node.right, scope));
         }
 
         static add(left, right) {
@@ -491,198 +699,227 @@ const ESTreeProcessor = (function() {
             return left ** right;
         }
 
-        static processBinaryExpression(expression) {
+        processBinaryExpression(node, scope) {
             let returnValue;
-            switch (expression.operator) {
+            const process = operation => this.doBinaryExpression(node, operation, scope);
+            switch (node.operator) {
                 case '+':
-                    returnValue = this.doBinaryExpression(expression, this.add);
+                    returnValue = process(ESTreeProcessor.add);
                     break;
                 case '-':
-                    returnValue = this.doBinaryExpression(expression, this.subtract);
+                    returnValue = process(ESTreeProcessor.subtract);
                     break;
                 case '*':
-                    returnValue = this.doBinaryExpression(expression, this.multiply);
+                    returnValue = process(ESTreeProcessor.multiply);
                     break;
                 case '/':
-                    returnValue = this.doBinaryExpression(expression, this.divide);
+                    returnValue = process(ESTreeProcessor.divide);
                     break;
                 case '%':
-                    returnValue = this.doBinaryExpression(expression, this.mod);
+                    returnValue = process(ESTreeProcessor.mod);
                     break;
                 case '**':
-                    returnValue = this.doBinaryExpression(expression, this.power);
+                    returnValue = process(ESTreeProcessor.power);
                     break;
                 case '>':
-                    returnValue = this.doBinaryExpression(expression, (left, right) => left > right);
+                    returnValue = process((left, right) => left > right);
                     break;
                 case '<':
-                    returnValue = this.doBinaryExpression(expression, (left, right) => left < right);
+                    returnValue = process((left, right) => left < right);
                     break;
                 case '==':
-                    returnValue = this.doBinaryExpression(expression, (left, right) => left == right);
+                    returnValue = process((left, right) => left == right);
                     break;
                 case '===':
-                    returnValue = this.doBinaryExpression(expression, (left, right) => left === right);
+                    returnValue = process((left, right) => left === right);
                     break;
                 case '>=':
-                    returnValue = this.doBinaryExpression(expression, (left, right) => left >= right);
+                    returnValue = process((left, right) => left >= right);
                     break;
                 case '<=':
-                    returnValue = this.doBinaryExpression(expression, (left, right) => left <= right);
+                    returnValue = process((left, right) => left <= right);
                     break;
                 case '!=':
-                    returnValue = this.doBinaryExpression(expression, (left, right) => left != right);
+                    returnValue = process((left, right) => left != right);
                     break;
                 case '!==':
-                    returnValue = this.doBinaryExpression(expression, (left, right) => left !== right);
+                    returnValue = process((left, right) => left !== right);
+                    break;
+                case '^':
+                    returnValue = process(ESTreeProcessor.bitwiseXOR);
+                    break;
+                case '|':
+                    returnValue = process(ESTreeProcessor.bitwiseOR);
+                    break;
+                case '&':
+                    returnValue = process(ESTreeProcessor.bitwiseAND);
+                    break;
+                case '>>':
+                    returnValue = process(ESTreeProcessor.bitwiseRightShift);
+                    break;
+                case '<<':
+                    returnValue = process(ESTreeProcessor.bitwiseLeftShift);
+                    break;
+                case '>>>':
+                    returnValue = process(ESTreeProcessor.bitwiseUnsignedRightShift);
                     break;
                 default:
-                    throw new SyntaxError(`Unexpected binary expression operator: ${expression.operator}`);
+                    throw new SyntaxError(`Unexpected binary expression operator: ${node.operator}`);
             }
             return returnValue;
         }
 
-        static processVariableDeclaration(node) {
+        processVariableDeclaration(node, scope) {
             switch (node.kind) {
-                // TODO: handle different declaration types
                 case 'let':
                 case 'const':
                 case 'var':
                     node.declarations.forEach(declaration => {
-                        this.processNode(declaration, node);
+                        declaration.kind = node.kind;
+                        this.processNode(declaration, scope);
                     });
                     break;
                 default:
                     throw new SyntaxError(`Unexpected variable declaration kind: ${node.type}`);
             }
+            // I believe declarations always return undefined
         }
 
-        static processVariableDeclarator(node, context) {
-            const name = this.processNode(node.id);
-            const value = node.init ? this.processNode(node.init, node) : undefined;
-            let declarationType;
-            switch (context.kind) {
-                case 'let':
-                    declarationType = ScopeContainer.VariableType.Let;
+        /**
+         *
+         * @param {*} node
+         * @param {Scope} scope
+         */
+        processVariableDeclarator(node, scope) {
+            switch (node.id.type) {
+                case esprima.Syntax.Identifier: {
+                    node.id.returnName = true;
+                    const name = this.processNode(node.id, scope);
+                    const value = node.init ? this.processNode(node.init, scope) : undefined;
+                    let declarationType;
+                    switch (node.kind) {
+                        case 'let':
+                            declarationType = VariableType.Let;
+                            break;
+                        case 'const':
+                            declarationType = VariableType.Const;
+                            break;
+                        case 'var':
+                            declarationType = VariableType.Var;
+                            break;
+                        default:
+                            throw new TypeError(`Unexpected variable declaration kind: ${node.kind}`);
+                    }
+                    scope.declare(declarationType, name, value);
                     break;
-                case 'const':
-                    declarationType = ScopeContainer.VariableType.Const;
+                }
+                case esprima.Syntax.ObjectPattern: {
+                    const object = this.processNode(node.init, scope);
+                    node.id.properties.forEach(property => {
+                        property.key.returnName = true;
+                        const name = this.processNode(property.key, scope);
+                        property.value.returnName = true;
+                        const valueName = this.processNode(property.value, scope);
+                        const value = object[valueName];
+                        let declarationType;
+                        switch (node.kind) {
+                            case 'let':
+                                declarationType = VariableType.Let;
+                                break;
+                            case 'const':
+                                declarationType = VariableType.Const;
+                                break;
+                            case 'var':
+                                declarationType = VariableType.Var;
+                                break;
+                            default:
+                                throw new TypeError(`Unexpected variable declaration kind: ${node.kind}`);
+                        }
+                        scope.declare(declarationType, name, value);
+                    });
                     break;
-                case 'var':
-                    declarationType = ScopeContainer.VariableType.Var;
-                    break;
+                }
                 default:
-                    throw new TypeError(`Unexpected variable declaration kind: ${context.kind}`);
+                    throw new SyntaxError(`Unexpected variable declarator id type: ${node.id.type}`);
             }
-            ScopeContainer.declare(declarationType, name, value);
         }
 
-        static processCallExpression(node, context) {
+        /**
+         *
+         * @param {*} node
+         * @param {Scope} scope
+         * @returns
+         */
+        processCallExpression(node, scope) {
+            // TODO: This code doesn't pass the sniff test. Need to work on it.
             const { callee } = node;
-            let returnValue;
             let methodToCall;
             let calleeObject;
+            let returnValue;
             switch (callee.type) {
                 case esprima.Syntax.MemberExpression: {
-                    if (callee.object.type === esprima.Syntax.Identifier) {
-                        calleeObject = this.processNode(callee.object, node);
-                    } else {
-                        calleeObject = this.processNode(callee.object);
-                    }
-                    methodToCall = calleeObject[callee.property.name];
-                    if (!methodToCall) {
-                        if (context && context.type === esprima.Syntax.ChainExpression) {
-                            return undefined;
+                    calleeObject = this.processNode(callee.object, scope);
+                    if (calleeObject == null) {
+                        if (callee.optional) {
+                            returnValue = new ChainIsNullish();
+                        } else {
+                            throw new SyntaxError('Callee object not found in call expression.');
                         }
-                        throw new SyntaxError(`Method not found: ${callee.property.name}`);
+                    } else if (calleeObject instanceof ChainIsNullish) {
+                        returnValue = new ChainIsNullish();
+                    } else {
+                        methodToCall = calleeObject[callee.property.name];
                     }
                     break;
                 }
                 case esprima.Syntax.Identifier:
-                    methodToCall = this.processNode(callee, node);
-                    break;
-                case esprima.Syntax.FunctionExpression:
-                case esprima.Syntax.FunctionDeclaration:
-                    methodToCall = callee;
+                    methodToCall = scope.getValue(callee.name);
                     break;
                 default:
                     throw new SyntaxError(`Unexpected callee type in call expression: ${callee.type}`);
             }
-            if (methodToCall.type === esprima.Syntax.FunctionDeclaration
-                || methodToCall.type === esprima.Syntax.FunctionExpression
-            ) {
-                ScopeContainer.addScope(ScopeContainer.ScopeType.Function);
-                for (let i = 0; i < Math.min(node.arguments.length, methodToCall.params.length); i++) {
-                    ScopeContainer.declare(
-                        ScopeContainer.VariableType.Var,
-                        this.processNode(methodToCall.params[i]),
-                        this.processNode(node.arguments[i], node)
-                    );
-                }
-                returnValue = this.processNode(methodToCall.body, methodToCall);
-                ScopeContainer.removeCurrentScope();
-            } else {
-                const args = node.arguments.map(arg => {
-                    const result = this.processNode(arg, node);
-                    if (result.type === esprima.Syntax.FunctionDeclaration
-                        || result.type === esprima.Syntax.FunctionExpression
-                    ) {
-                        return (...innerArgs) => {
-                            // TODO: Assuming literal here, but arguments could be objects, functions, etc.
-                            // Need to use typeof and convert to ESTree object as appropriate.
-                            innerArgs = innerArgs.map(innerArg => ({
-                                type: 'Literal',
-                                value: innerArg
-                            }));
-                            const callExpression = {
-                                arguments: innerArgs,
-                                type: esprima.Syntax.CallExpression,
-                                callee: result
-                            };
-                            result.arguments = innerArgs;
-                            return this.processCallExpression(callExpression);
-                        };
+
+            if (!(returnValue instanceof ChainIsNullish)) {
+                if (methodToCall == null) {
+                    if (node.optional) {
+                        returnValue = new ChainIsNullish();
+                    } else {
+                        let methodName;
+                        switch (callee.type) {
+                            case esprima.Syntax.Identifier:
+                                methodName = callee.name;
+                                break;
+                            case esprima.Syntax.MemberExpression:
+                                callee.property.returnName = true;
+                                methodName = this.processNode(callee.property);
+                                break;
+                            default:
+                        }
+                        throw new SyntaxError(`Method not found: ${methodName}`);
                     }
-                    return result;
-                });
-                returnValue = methodToCall.call(calleeObject, ...args);
-            }
-            // const args = expression.arguments.map(arg => this.processNode(arg, expression));
-            // const returnValue = methodToCall.call(calleeObject, ...args);
-            return returnValue;
-        }
-
-        static equals(left, right) {
-            let returnValue;
-            switch (left.type) {
-                case esprima.Syntax.Identifier:
-                    returnValue = ScopeContainer.setValue(left.name, this.processNode(right));
-                    break;
-                case esprima.Syntax.MemberExpression: {
-                    const object = this.getMemberExpressionObject(left);
-                    returnValue = (object[this.processNode(left.property)] = this.processNode(right));
-                    break;
+                } else {
+                    const args = node.arguments.map(arg => this.processNode(arg, scope));
+                    // if (!methodToCall) debugger;
+                    returnValue = methodToCall.call(calleeObject, ...args);
                 }
-                default:
-                    throw new SyntaxError(`Unexpected type on left side of assignment expression: ${left.type}`);
             }
             return returnValue;
         }
 
-        static doAssignmentExpression(node, func) {
+        doAssignmentExpression(node, func, scope) {
             let returnValue;
             let leftValue;
             switch (node.left.type) {
                 case esprima.Syntax.Identifier: {
-                    leftValue = ScopeContainer.getValue(node.left.name);
-                    returnValue = ScopeContainer.setValue(node.left.name, func(leftValue, this.processNode(node.right, node)));
+                    leftValue = scope.getValue(node.left.name);
+                    returnValue = this.setScopeValue(node.left, func(leftValue, this.processNode(node.right, scope)), scope);
                     break;
                 }
                 case esprima.Syntax.MemberExpression: {
-                    const object = this.getMemberExpressionObject(node.left);
-                    const propertyName = this.processNode(node.left.property);
+                    const object = this.getMemberExpressionObject(node.left, scope);
+                    const propertyName = this.processNode(node.left.property, scope);
                     leftValue = object[propertyName];
-                    returnValue = (object[propertyName] = func(leftValue, this.processNode(node.right, node)));
+                    returnValue = (object[propertyName] = func(leftValue, this.processNode(node.right, scope)));
                     break;
                 }
                 default:
@@ -691,7 +928,6 @@ const ESTreeProcessor = (function() {
             return returnValue;
         }
 
-        /** This is not supported by the v4 of the esprima parser */
         static nullishCoalesce(left, right) {
             return left ?? right;
         }
@@ -704,38 +940,81 @@ const ESTreeProcessor = (function() {
             return left && right;
         }
 
-        static processAssigmentExpression(node) {
+        static bitwiseAND(left, right) {
+            return left & right;
+        }
+
+        static bitwiseOR(left, right) {
+            return left | right;
+        }
+
+        static bitwiseXOR(left, right) {
+            return left ^ right;
+        }
+
+        static bitwiseLeftShift(left, right) {
+            return left << right;
+        }
+
+        static bitwiseRightShift(left, right) {
+            return left >> right;
+        }
+
+        static bitwiseUnsignedRightShift(left, right) {
+            return left >>> right;
+        }
+
+        processAssigmentExpression(node, scope) {
             let returnValue;
+            const assign = operation => this.doAssignmentExpression(node, operation, scope);
             switch (node.operator) {
                 case '=':
-                    returnValue = this.equals(node.left, node.right, node);
+                    returnValue = this.setScopeValue(node.left, this.processNode(node.right, scope), scope);
                     break;
                 case '+=':
-                    returnValue = this.doAssignmentExpression(node, this.add);
+                    returnValue = assign(ESTreeProcessor.add);
                     break;
                 case '-=':
-                    returnValue = this.doAssignmentExpression(node, this.subtract);
+                    returnValue = assign(ESTreeProcessor.subtract);
                     break;
                 case '*=':
-                    returnValue = this.doAssignmentExpression(node, this.multiply);
+                    returnValue = assign(ESTreeProcessor.multiply);
                     break;
                 case '/=':
-                    returnValue = this.doAssignmentExpression(node, this.divide);
+                    returnValue = assign(ESTreeProcessor.divide);
                     break;
                 case '%=':
-                    returnValue = this.doAssignmentExpression(node, this.mod);
+                    returnValue = assign(ESTreeProcessor.mod);
                     break;
                 case '**=':
-                    returnValue = this.doAssignmentExpression(node, this.power);
+                    returnValue = assign(ESTreeProcessor.power);
                     break;
                 case '??=':
-                    returnValue = this.doAssignmentExpression(node, this.nullishCoalesce);
+                    returnValue = assign(ESTreeProcessor.nullishCoalesce);
                     break;
                 case '||=':
-                    returnValue = this.doAssignmentExpression(node, this.or);
+                    returnValue = assign(ESTreeProcessor.or);
                     break;
                 case '&&=':
-                    returnValue = this.doAssignmentExpression(node, this.and);
+                    returnValue = assign(ESTreeProcessor.and);
+                    break;
+                case '<<=':
+                    returnValue = assign(ESTreeProcessor.bitwiseLeftShift);
+                    break;
+                case '>>=':
+                    returnValue = assign(ESTreeProcessor.bitwiseRightShift);
+                    break;
+                case '>>>=':
+                    returnValue = assign(ESTreeProcessor.bitwiseUnsignedRightShift);
+                    break;
+                case '&=':
+                    returnValue = assign(ESTreeProcessor.bitwiseAND);
+                    break;
+                case '|=':
+                    returnValue = assign(ESTreeProcessor.bitwiseOR);
+                    break;
+                case '^=':
+                    returnValue = assign(ESTreeProcessor.bitwiseXOR);
                     break;
                 default:
                     throw new SyntaxError(`Unexpected assigment expression operator: ${node.operator}`);
