@@ -17,7 +17,6 @@
 
 /* global ESTreeProcessor */
 /* global Test */
-/* global esprima */
 
 console.log('started');
 
@@ -25,8 +24,7 @@ console.log('started');
     'use strict';
 
     window.ESTreeProcessor = ESTreeProcessor;
-    window.esprima = esprima;
-    ESTreeProcessor.debug = true;
+    // ESTreeProcessor.debug = true;
 
     const moreTests = [
         "return fieldValues.ARPT_NAME + ' ' + '(' + (fieldValues.NOTAM_ID) + ')';",
@@ -2659,12 +2657,11 @@ sec.WMETB_IsGC();
             testCount++;
             tree = parseProcessLabelFunction(test.code);
 
-            const processor = new ESTreeProcessor();
             let testResult;
             test.variables.Date = Date;
             test.variables.prompt = prompt;
             try {
-                testResult = processor.process(tree, test.variables);
+                testResult = ESTreeProcessor.execute(tree, test.variables);
             } catch (ex) {
                 testResult = { output: ex, variables: test.variables };
             }
@@ -2678,7 +2675,7 @@ sec.WMETB_IsGC();
             // testResult.variables = testResultVariables;
 
             const validationResult = test.validate(testResult);
-            testResult.variables = ESTreeProcessor.variableHistory;
+            // testResult.variables = ESTreeProcessor.variableHistory;
             if (SHOW_ALL_RESULTS || !validationResult.outputValidated || !validationResult.variablesValidated || ONLY_RUN_TEST_ID) {
                 console.log(`TEST ID:    %c${test.id}`, boldFont);
                 console.log('%cOUTPUT:    ', validationResult.outputValidated ? normal : yellowBackground, testResult.output); // .replace('\n', '\\n'));
@@ -2709,7 +2706,7 @@ sec.WMETB_IsGC();
     });
 
     function parseProcessLabelFunction(script) {
-        return esprima.parseScript(`function __$lp(){${script}} __$lp()`);
+        return ESTreeProcessor.compile(`function __$lp(){${script}} __$lp()`);
     }
     console.log(`TESTS COMPLETED: ${testCount}`);
 })();
